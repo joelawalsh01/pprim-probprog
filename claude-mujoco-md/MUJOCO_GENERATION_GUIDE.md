@@ -294,7 +294,7 @@ When a user asks you to generate a MuJoCo scene, ask about any of these that are
 
   <sensor>
     <framepos name="ball_pos" objtype="body" objname="ball"/>
-    <framevelocity name="ball_vel" objtype="body" objname="ball"/>
+    <framelinvel name="ball_vel" objtype="body" objname="ball"/>
   </sensor>
 </mujoco>
 ```

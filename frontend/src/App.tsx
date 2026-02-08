@@ -122,7 +122,7 @@ const FALLBACK_MJCF = `<mujoco model="disessa_ball">
 
   <sensor>
     <framepos name="ball_pos" objtype="body" objname="ball"/>
-    <framevelocity name="ball_vel" objtype="body" objname="ball"/>
+    <framelinvel name="ball_vel" objtype="body" objname="ball"/>
   </sensor>
 </mujoco>`;
 

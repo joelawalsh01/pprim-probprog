@@ -44,7 +44,24 @@ export interface InferenceResult {
   interpretation: {
     findings: string[];
     summary: string;
+    reasoning?: ReasoningStep[];
   };
+}
+
+export interface ReasoningStep {
+  parameter: string;
+  prior: string;
+  prior_mean: number;
+  posterior_mean: number;
+  posterior_std: number;
+  shift: number;
+  rule: string;
+  thresholds: {
+    condition: string;
+    triggered: boolean;
+    label: string;
+  }[];
+  conclusion: string;
 }
 
 export interface ExampleInfo {

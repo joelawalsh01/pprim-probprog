@@ -173,6 +173,7 @@ def posterior_predictive(req: PosteriorPredictiveRequest):
 def generate_interpretation(posterior: dict) -> dict:
     """Generate plain-English interpretation of posterior results."""
     findings = []
+    reasoning_steps = []
     summary = ""
 
     vp = posterior.get("velocity_persistence", {})
@@ -180,8 +181,43 @@ def generate_interpretation(posterior: dict) -> dict:
     fm = posterior.get("force_magnitude", {})
     mass = posterior.get("mass", {})
 
+    # --- velocity_persistence ---
     if vp:
         vp_mean = vp.get("mean", 0.5)
+        vp_std = vp.get("std", 0.0)
+        vp_prior = "Beta(2, 2) — centered at 0.5, meaning we start with no assumption about whether force replaces or adds to velocity"
+
+        reasoning_steps.append({
+            "parameter": "velocity_persistence",
+            "prior": vp_prior,
+            "prior_mean": 0.5,
+            "posterior_mean": round(vp_mean, 4),
+            "posterior_std": round(vp_std, 4),
+            "shift": round(vp_mean - 0.5, 4),
+            "rule": (
+                "This parameter controls what happens to existing velocity when a new force is applied. "
+                "At 0, the force completely replaces the current velocity (the ball forgets it was moving horizontally). "
+                "At 1, the force adds to the current velocity (Newtonian superposition). "
+                "In the model's forward simulation, horizontal velocity at each timestep is multiplied by "
+                "velocity_persistence — so values near 0 kill horizontal motion instantly."
+            ),
+            "thresholds": [
+                {"condition": "mean < 0.3", "triggered": vp_mean < 0.3, "label": "Force replaces velocity (naive / 'force as mover' p-prim)"},
+                {"condition": "0.3 ≤ mean ≤ 0.7", "triggered": 0.3 <= vp_mean <= 0.7, "label": "Mixed beliefs — partial persistence"},
+                {"condition": "mean > 0.7", "triggered": vp_mean > 0.7, "label": "Force adds to velocity (Newtonian / 'force as deflector')"},
+            ],
+            "conclusion": (
+                f"Posterior mean = {vp_mean:.3f} (shifted {'toward 0' if vp_mean < 0.5 else 'toward 1'} from prior mean of 0.5). "
+                + (
+                    "This is strong evidence for the 'force as mover' p-prim — the person's predicted trajectory is best explained by a model where force replaces existing velocity."
+                    if vp_mean < 0.3 else
+                    "This suggests beliefs broadly consistent with Newtonian mechanics — force adds to existing motion."
+                    if vp_mean > 0.7 else
+                    "This suggests a mixed model — the person partially preserves existing velocity but not fully."
+                )
+            ),
+        })
+
         if vp_mean < 0.3:
             findings.append(
                 f"velocity_persistence is low ({vp_mean:.3f}): This person implicitly believes "
@@ -199,8 +235,44 @@ def generate_interpretation(posterior: dict) -> dict:
                 "believes force replaces velocity but retains some Newtonian intuition."
             )
 
+    # --- lateral_damping ---
     if ld:
         ld_mean = ld.get("mean", 1.0)
+        ld_std = ld.get("std", 0.0)
+        ld_prior_mean = 1.65  # exp(0 + 1^2/2) for LogNormal(0,1)
+        ld_prior = "LogNormal(0, 1) — broad prior allowing both low damping (motion persists) and high damping (motion dies)"
+
+        reasoning_steps.append({
+            "parameter": "lateral_damping",
+            "prior": ld_prior,
+            "prior_mean": round(ld_prior_mean, 4),
+            "posterior_mean": round(ld_mean, 4),
+            "posterior_std": round(ld_std, 4),
+            "shift": round(ld_mean - ld_prior_mean, 4),
+            "rule": (
+                "This parameter controls how quickly horizontal velocity decays over time, independent of "
+                "velocity_persistence. In the model, horizontal velocity is multiplied by exp(-lateral_damping × dt) "
+                "each timestep. High values mean horizontal motion dies quickly even without a new force — "
+                "like an implicit belief that objects naturally stop moving (an Aristotelian intuition). "
+                "Low values mean motion persists (Newton's first law)."
+            ),
+            "thresholds": [
+                {"condition": "mean < 0.5", "triggered": ld_mean < 0.5, "label": "Low damping — motion persists (Newtonian)"},
+                {"condition": "0.5 ≤ mean ≤ 2.0", "triggered": 0.5 <= ld_mean <= 2.0, "label": "Moderate damping"},
+                {"condition": "mean > 2.0", "triggered": ld_mean > 2.0, "label": "High damping — motion dies quickly (Aristotelian)"},
+            ],
+            "conclusion": (
+                f"Posterior mean = {ld_mean:.3f}. "
+                + (
+                    "High damping reinforces the naive picture: the person expects horizontal motion to dissipate, as if objects naturally come to rest unless actively pushed."
+                    if ld_mean > 2.0 else
+                    "Low damping is consistent with Newton's first law — objects in motion stay in motion."
+                    if ld_mean < 0.5 else
+                    "Moderate damping — some belief in natural deceleration but not extreme."
+                )
+            ),
+        })
+
         if ld_mean > 2.0:
             findings.append(
                 f"lateral_damping is high ({ld_mean:.3f}): The person believes horizontal "
@@ -212,6 +284,51 @@ def generate_interpretation(posterior: dict) -> dict:
                 "objects in motion stay in motion."
             )
 
+    # --- force_magnitude ---
+    if fm:
+        fm_mean = fm.get("mean", 1.0)
+        fm_std = fm.get("std", 0.0)
+        fm_prior_mean = 3.08  # exp(1 + 0.5^2/2) for LogNormal(1, 0.5)
+
+        reasoning_steps.append({
+            "parameter": "force_magnitude",
+            "prior": "LogNormal(1, 0.5) — prior expectation of moderate force",
+            "prior_mean": round(fm_prior_mean, 4),
+            "posterior_mean": round(fm_mean, 4),
+            "posterior_std": round(fm_std, 4),
+            "shift": round(fm_mean - fm_prior_mean, 4),
+            "rule": (
+                "The perceived strength of the applied force. This interacts with mass to determine "
+                "vertical acceleration (a = F/m). The inference adjusts this to match the vertical "
+                "component of the observed trajectory."
+            ),
+            "thresholds": [],
+            "conclusion": f"Posterior mean = {fm_mean:.3f}. The model found this force magnitude best reproduces the vertical motion in the observed trajectory.",
+        })
+
+    # --- mass ---
+    if mass:
+        m_mean = mass.get("mean", 1.0)
+        m_std = mass.get("std", 0.0)
+        m_prior_mean = 1.13  # exp(0 + 0.5^2/2) for LogNormal(0, 0.5)
+
+        reasoning_steps.append({
+            "parameter": "mass",
+            "prior": "LogNormal(0, 0.5) — prior centered near 1 kg",
+            "prior_mean": round(m_prior_mean, 4),
+            "posterior_mean": round(m_mean, 4),
+            "posterior_std": round(m_std, 4),
+            "shift": round(m_mean - m_prior_mean, 4),
+            "rule": (
+                "The perceived mass of the object. Together with force_magnitude, this determines "
+                "vertical acceleration. Mass and force are partially degenerate (only their ratio matters "
+                "for acceleration), so the posterior may be broad."
+            ),
+            "thresholds": [],
+            "conclusion": f"Posterior mean = {m_mean:.3f}. Combined with force_magnitude, this gives a perceived acceleration of {fm.get('mean', 10.0) / m_mean:.2f} m/s²." if fm else f"Posterior mean = {m_mean:.3f}.",
+        })
+
+    # --- summary ---
     if vp and vp.get("mean", 0.5) < 0.3:
         summary = (
             "A person expecting this trajectory implicitly believes that force replaces "
@@ -229,4 +346,5 @@ def generate_interpretation(posterior: dict) -> dict:
     return {
         "findings": findings,
         "summary": summary,
+        "reasoning": reasoning_steps,
     }
