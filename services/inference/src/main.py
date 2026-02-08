@@ -202,7 +202,7 @@ def generate_interpretation(posterior: dict) -> dict:
                 "velocity_persistence — so values near 0 kill horizontal motion instantly."
             ),
             "thresholds": [
-                {"condition": "mean < 0.3", "triggered": vp_mean < 0.3, "label": "Force replaces velocity (naive / 'force as mover' p-prim)"},
+                {"condition": "mean < 0.3", "triggered": vp_mean < 0.3, "label": "Force replaces velocity (alternative conception / 'force as mover' p-prim)"},
                 {"condition": "0.3 ≤ mean ≤ 0.7", "triggered": 0.3 <= vp_mean <= 0.7, "label": "Mixed beliefs — partial persistence"},
                 {"condition": "mean > 0.7", "triggered": vp_mean > 0.7, "label": "Force adds to velocity (Newtonian / 'force as deflector')"},
             ],
@@ -222,7 +222,7 @@ def generate_interpretation(posterior: dict) -> dict:
             findings.append(
                 f"velocity_persistence is low ({vp_mean:.3f}): This person implicitly believes "
                 "that an applied force *replaces* the existing velocity rather than adding to it. "
-                "This is the classic naive physics misconception."
+                "This is a classic alternative conception in physics."
             )
         elif vp_mean > 0.7:
             findings.append(
@@ -264,7 +264,7 @@ def generate_interpretation(posterior: dict) -> dict:
             "conclusion": (
                 f"Posterior mean = {ld_mean:.3f}. "
                 + (
-                    "High damping reinforces the naive picture: the person expects horizontal motion to dissipate, as if objects naturally come to rest unless actively pushed."
+                    "High damping reinforces the alternative conception: the person expects horizontal motion to dissipate, as if objects naturally come to rest unless actively pushed."
                     if ld_mean > 2.0 else
                     "Low damping is consistent with Newton's first law — objects in motion stay in motion."
                     if ld_mean < 0.5 else

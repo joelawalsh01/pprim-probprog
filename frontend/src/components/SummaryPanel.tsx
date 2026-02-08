@@ -341,7 +341,7 @@ export default function SummaryPanel({ inferResult, loading }: Props) {
         <div style={headerStyle}>Summary</div>
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ color: '#565f89', fontSize: '13px', textAlign: 'center', padding: '0 20px' }}>
-            Run inference to see what physics priors explain the naive trajectory
+            Run inference to see what physics priors explain the alternative trajectory
           </div>
         </div>
       </div>

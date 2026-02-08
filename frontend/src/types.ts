@@ -64,6 +64,15 @@ export interface ReasoningStep {
   conclusion: string;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  mjcfXml: string;
+  pyroCode: string;
+  simResult: SimulationResult | null;
+  inferResult: InferenceResult | null;
+}
+
 export interface ExampleInfo {
   name: string;
   filename: string;

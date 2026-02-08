@@ -2,7 +2,7 @@
 
 **Extracting Phenomenological Primitives Through Probabilistic Programming**
 
-A browser-based tool that uses analysis-by-synthesis to reverse-engineer the implicit physical beliefs (p-prims) behind naive predictions about motion. Built on a MuJoCo physics engine and Pyro probabilistic programming framework.
+A browser-based tool that uses analysis-by-synthesis to reverse-engineer the implicit physical beliefs (p-prims) behind alternative conceptions about motion. Built on a MuJoCo physics engine and Pyro probabilistic programming framework.
 
 ---
 
@@ -12,7 +12,7 @@ Imagine a ball rolling horizontally across a table. Suddenly, a constant upward 
 
 Most people — including many students — predict that the ball goes **straight up**. Newtonian mechanics says it should curve **diagonally**, because the upward force *adds to* the existing horizontal velocity rather than replacing it.
 
-This tool asks: **what implicit physical model would a person need to hold in order to expect the naive (straight-up) outcome?** Rather than simply noting that the prediction is wrong, we use probabilistic inference to *quantify* the underlying beliefs.
+This tool asks: **what implicit physical model would a person need to hold in order to expect the alternative (straight-up) outcome?** Rather than simply noting that the prediction is wrong, we use probabilistic inference to *quantify* the underlying beliefs.
 
 ### The Connection to P-Prims
 
@@ -21,7 +21,7 @@ DiSessa's phenomenological primitives (p-prims) are the small, intuitive knowled
 - **"Force as mover"** — the intuition that a force *sets* an object's motion. If you push something up, it goes up. The prior motion is irrelevant.
 - **"Force as deflector"** — the Newtonian-consistent intuition that a force *changes* existing motion. The ball was already moving right; an upward push makes it go diagonally.
 
-These p-prims aren't just qualitative labels. This tool shows that they correspond to specific, measurable values of parameters in a generative physical model. When someone predicts the naive trajectory, their implicit `velocity_persistence` parameter is near 0 (force replaces velocity). When someone predicts the Newtonian trajectory, that same parameter is near 1 (force adds to velocity).
+These p-prims aren't just qualitative labels. This tool shows that they correspond to specific, measurable values of parameters in a generative physical model. When someone predicts the alternative trajectory, their implicit `velocity_persistence` parameter is near 0 (force replaces velocity). When someone predicts the Newtonian trajectory, that same parameter is near 1 (force adds to velocity).
 
 ---
 
@@ -29,36 +29,24 @@ These p-prims aren't just qualitative labels. This tool shows that they correspo
 
 The approach follows an **analysis-by-synthesis** loop:
 
-```
-                    ┌─────────────────────┐
-                    │  Observed Behavior   │
-                    │  (naive prediction)  │
-                    └──────────┬──────────┘
-                               │
-                    ┌──────────▼──────────┐
-                    │  Probabilistic Model │
-                    │  with learnable      │
-                    │  "cognitive physics" │
-                    │  parameters          │
-                    └──────────┬──────────┘
-                               │
-                    ┌──────────▼──────────┐
-                    │  Bayesian Inference  │
-                    │  (What parameter     │
-                    │   values explain     │
-                    │   this prediction?)  │
-                    └──────────┬──────────┘
-                               │
-                    ┌──────────▼──────────┐
-                    │  Posterior over      │
-                    │  physical beliefs    │
-                    │  (extracted p-prims) │
-                    └─────────────────────┘
+```mermaid
+flowchart TD
+    A["<b>Observed Behavior</b><br/><i>alternative prediction</i>"]
+    B["<b>Probabilistic Model</b><br/>with learnable<br/>'cognitive physics' parameters"]
+    C["<b>Bayesian Inference</b><br/>What parameter values<br/>explain this prediction?"]
+    D["<b>Posterior over<br/>Physical Beliefs</b><br/><i>extracted p-prims</i>"]
+
+    A --> B --> C --> D
+
+    style A fill:#2d333b,stroke:#7aa2f7,color:#c0caf5
+    style B fill:#2d333b,stroke:#9ece6a,color:#c0caf5
+    style C fill:#2d333b,stroke:#e0af68,color:#c0caf5
+    style D fill:#2d333b,stroke:#bb9af7,color:#c0caf5
 ```
 
 1. **We define a generative model** with tunable parameters that represent different physical beliefs — how much prior velocity persists when a new force is applied, how quickly motion decays, how strong the force feels, etc.
 
-2. **We feed in the naive trajectory** (ball goes straight up) as the "observed data."
+2. **We feed in the alternative trajectory** (ball goes straight up) as the "observed data."
 
 3. **Bayesian inference searches** for parameter values that would produce this trajectory. It doesn't just find one answer — it finds a *distribution* of plausible values, telling us both what the person likely believes and how confident we can be.
 
@@ -70,8 +58,8 @@ The approach follows an **analysis-by-synthesis** loop:
 
 The probabilistic model exposes these "cognitive physics" parameters:
 
-| Parameter | What it represents | Naive value | Newtonian value |
-|-----------|-------------------|-------------|-----------------|
+| Parameter | What it represents | Alternative value | Newtonian value |
+|-----------|-------------------|-------------------|-----------------|
 | **velocity_persistence** | Does force replace or add to existing motion? | ~0 (replaces) | ~1 (adds) |
 | **lateral_damping** | How fast does horizontal motion die out? | High (motion stops) | ~0 (motion persists) |
 | **force_magnitude** | How strong does the force feel? | Varies | Varies |
@@ -85,30 +73,47 @@ The first two parameters are the most diagnostic. Together, they capture the "fo
 
 The system has three services that run in Docker:
 
-```
-┌──────────────────────────────────────────────────────┐
-│                    Browser (port 3000)                │
-│                                                       │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────────────┐ │
-│  │ Animation │ │  MuJoCo  │ │     Pyro Model       │ │
-│  │  + naive  │ │   Code   │ │       Code           │ │
-│  │  overlay  │ │  Editor  │ │      Editor          │ │
-│  ├──────────┤ ├──────────┤ ├──────────────────────┤ │
-│  │ Prior vs │ │Trajectory│ │      Summary +       │ │
-│  │Posterior │ │Comparison│ │   Interpretation     │ │
-│  └──────────┘ └──────────┘ └──────────────────────┘ │
-└──────────┬──────────────────────────┬────────────────┘
-           │                          │
-    ┌──────▼──────┐           ┌──────▼──────┐
-    │  Simulator  │           │  Inference  │
-    │  (MuJoCo)   │           │   (Pyro)    │
-    │  port 8001  │           │  port 8002  │
-    └─────────────┘           └─────────────┘
+```mermaid
+flowchart TB
+    subgraph browser["Browser — localhost:3000"]
+        direction TB
+        subgraph top[""]
+            A1["Animation<br/>+ alternative overlay"]
+            A2["MuJoCo Code<br/>Editor"]
+            A3["Pyro Model<br/>Code Editor"]
+        end
+        subgraph bottom[""]
+            B1["Prior vs<br/>Posterior"]
+            B2["Trajectory<br/>Comparison"]
+            B3["Summary +<br/>Interpretation"]
+        end
+        tabs["Project Tabs — switch between scenarios"]
+    end
+
+    subgraph services["Docker Services"]
+        S["Simulator<br/><i>FastAPI + MuJoCo</i><br/>port 8001"]
+        I["Inference<br/><i>FastAPI + Pyro</i><br/>port 8002"]
+    end
+
+    browser -->|"/api/sim/*"| S
+    browser -->|"/api/infer/*"| I
+
+    style browser fill:#1a1b26,stroke:#3b3d57,color:#c0caf5
+    style services fill:#16161e,stroke:#3b3d57,color:#c0caf5
+    style tabs fill:#2a2b3d,stroke:#7aa2f7,color:#7aa2f7
+    style S fill:#2d333b,stroke:#7aa2f7,color:#c0caf5
+    style I fill:#2d333b,stroke:#bb9af7,color:#c0caf5
+    style A1 fill:#2d333b,stroke:#7aa2f7,color:#c0caf5
+    style A2 fill:#2d333b,stroke:#9ece6a,color:#c0caf5
+    style A3 fill:#2d333b,stroke:#bb9af7,color:#c0caf5
+    style B1 fill:#2d333b,stroke:#e0af68,color:#c0caf5
+    style B2 fill:#2d333b,stroke:#9ece6a,color:#c0caf5
+    style B3 fill:#2d333b,stroke:#f7768e,color:#c0caf5
 ```
 
 - **Simulator service** — Runs MuJoCo physics simulations. Takes scene descriptions (MJCF XML), applies forces, returns trajectories and rendered frames.
 - **Inference service** — Runs Pyro probabilistic programs. Takes an observed trajectory, fits the cognitive physics model, returns posterior distributions over belief parameters.
-- **Frontend** — A 6-panel dashboard where you can edit the physics scene and the probabilistic model, run simulations and inference, and explore the results visually.
+- **Frontend** — A 6-panel dashboard with project tabs, where you can edit the physics scene and the probabilistic model, run simulations and inference, and explore the results visually.
 
 ---
 
@@ -130,22 +135,33 @@ Then open **http://localhost:3000**.
 
 ### Using the Dashboard
 
-1. **The diSessa ball scenario loads automatically** — a ball with horizontal velocity and an upward force.
+1. **The diSessa ball scenario loads automatically** as a saved project — a ball with horizontal velocity and an upward force.
 
 2. **Click "Simulate"** to run the MuJoCo physics engine. You'll see:
    - The Newtonian trajectory (ball curves diagonally — blue solid line)
-   - The naive trajectory overlay (ball goes straight up — red dashed line)
+   - The alternative trajectory overlay (ball goes straight up — red dashed line)
    - Rendered animation frames from the physics engine
 
-3. **Click "Run Inference"** to ask: what physical beliefs explain the naive prediction? The Pyro inference engine will:
+3. **Click "Run Inference"** to ask: what physical beliefs explain the alternative prediction? The Pyro inference engine will:
    - Start from broad prior distributions over each parameter
-   - Search for parameter values that would produce the naive trajectory
+   - Search for parameter values that would produce the alternative trajectory
    - Return posterior distributions showing the most likely belief values
 
 4. **Explore the results:**
    - **Prior vs Posterior panel** — histograms showing how each parameter shifted from its prior. Look for `velocity_persistence` concentrating near 0.
-   - **Trajectory panel** — visual comparison of Newtonian (correct) vs naive (predicted) paths.
+   - **Trajectory panel** — visual comparison of Newtonian (correct) vs alternative (predicted) paths.
    - **Summary panel** — parameter estimates, convergence plot, and a plain-English interpretation of what the posteriors mean in terms of physical intuitions.
+
+### Project Tabs
+
+The dashboard supports multiple projects via a tab bar below the header:
+
+- **DiSessa Ball** is pre-loaded as the default project
+- Click **"+"** to create a new blank project with a template MuJoCo scene
+- **Switch between tabs** to work on different scenarios — each project retains its own MJCF, Pyro code, simulation results, and inference results independently
+- **Double-click** a tab name to rename it
+- **Close** a tab with the "×" button (at least one project must remain open)
+- Projects are **persisted to localStorage** — they survive page refreshes
 
 ---
 
@@ -172,7 +188,7 @@ The MuJoCo XML is also editable. You can modify:
 The inference endpoint accepts custom observed trajectories. You could feed in:
 
 - **Student drawing data** — digitize a student's hand-drawn prediction
-- **Interpolated trajectories** — test "halfway" predictions between naive and Newtonian
+- **Interpolated trajectories** — test "halfway" predictions between alternative and Newtonian
 - **Other scenarios** — circular motion, collisions, pendulums
 
 ---
@@ -201,7 +217,7 @@ This connects to broader work on:
 
 ### Why Probabilistic Programming?
 
-Traditional analysis would classify a student's prediction as "naive" or "Newtonian" — a binary label. Probabilistic programming gives us:
+Traditional analysis would classify a student's prediction as having an "alternative conception" or being "Newtonian" — a binary label. Probabilistic programming gives us:
 
 - **Continuous measurements** instead of categories — a student can be 30% Newtonian
 - **Uncertainty quantification** — we know how confident we are about the extracted beliefs
@@ -218,17 +234,21 @@ pprim-probprog/
 ├── claude-mujoco-md/
 │   └── MUJOCO_GENERATION_GUIDE.md  # Reference for generating MuJoCo scenes
 ├── frontend/                       # React + Vite + TypeScript dashboard
-│   └── src/components/
-│       ├── AnimationPanel.tsx       # Physics animation + naive overlay
-│       ├── MujocoCodePanel.tsx      # Editable MJCF XML
-│       ├── PyroCodePanel.tsx        # Editable Pyro model
-│       ├── PriorPosteriorPanel.tsx  # Distribution histograms
-│       ├── TrajectoryPanel.tsx      # Path comparison plot
-│       └── SummaryPanel.tsx         # Results + interpretation
+│   └── src/
+│       ├── App.tsx                 # Project state management + localStorage
+│       ├── types.ts                # Project, SimulationResult, InferenceResult types
+│       └── components/
+│           ├── Dashboard.tsx       # Layout + project tab bar
+│           ├── AnimationPanel.tsx  # Physics animation + alternative overlay
+│           ├── MujocoCodePanel.tsx # Editable MJCF XML
+│           ├── PyroCodePanel.tsx   # Editable Pyro model
+│           ├── PriorPosteriorPanel.tsx  # Distribution histograms
+│           ├── TrajectoryPanel.tsx      # Path comparison plot
+│           └── SummaryPanel.tsx         # Results + interpretation
 ├── services/
 │   ├── simulator/                  # FastAPI + MuJoCo
 │   │   └── src/
-│   │       ├── simulation.py       # Physics engine + naive trajectory
+│   │       ├── simulation.py       # Physics engine + alternative trajectory
 │   │       └── renderer.py         # Offscreen frame rendering
 │   └── inference/                  # FastAPI + Pyro
 │       └── src/

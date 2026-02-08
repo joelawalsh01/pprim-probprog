@@ -118,7 +118,7 @@ export default function TrajectoryPanel({ simTrajectory, naiveTrajectory, newton
     const items = [
       { label: 'MuJoCo sim', color: '#7aa2f7', has: !!simTrajectory },
       { label: 'Newtonian', color: '#9ece6a', has: !!newtonianTrajectory },
-      { label: 'Naive', color: '#f7768e', has: !!naiveTrajectory },
+      { label: 'Alternative', color: '#f7768e', has: !!naiveTrajectory },
     ];
     ctx.font = '11px sans-serif';
     for (const item of items) {

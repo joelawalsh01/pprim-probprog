@@ -136,7 +136,7 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     ctx.fillText('Newtonian', margin, 20);
     if (showNaive) {
       ctx.fillStyle = '#f7768e';
-      ctx.fillText('Naive', margin + 80, 20);
+      ctx.fillText('Alternative', margin + 80, 20);
     }
   }
 
@@ -175,7 +175,7 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
               onChange={e => setShowNaive(e.target.checked)}
               style={{ marginRight: '4px' }}
             />
-            Show naive
+            Show alternative
           </label>
           {frames && frames.length > 0 && (
             <button
