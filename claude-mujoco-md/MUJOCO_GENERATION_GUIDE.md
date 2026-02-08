@@ -243,14 +243,58 @@ When a user asks you to generate a MuJoCo scene, ask about any of these that are
 - [ ] Render resolution?
 - [ ] Background color?
 
+### Alternative Conceptions (P-Prims) — Optional
+
+> **Ask the user:** *Are there known alternative conceptions (p-prims) associated with this scenario? If so, describe them. If not, skip this step.*
+
+If the user specifies p-prims, use them to generate a **"What to look for after inference"** section alongside the MJCF output. This tells the user which posterior parameters to check and what values would indicate each p-prim is active.
+
+**If p-prims are provided**, include output like this:
+
+> **What to look for after inference:**
+>
+> You described the following alternative conceptions for this scenario. After running inference in the dashboard, check these posterior parameters:
+>
+> | P-prim | What it predicts | Parameter to check | Indicative value |
+> |--------|-----------------|-------------------|-----------------|
+> | *(from user)* | *(from user)* | *(your mapping)* | *(your mapping)* |
+>
+> If the posterior concentrates at the indicative value, the observed trajectory is best explained by that alternative conception.
+
+**If the user skips this step**, just output the MJCF XML with no p-prim analysis.
+
+#### How to map p-prims to model parameters
+
+Common mappings (extend as needed for novel scenarios):
+
+| P-prim | Description | Model parameter | Alternative value | Newtonian value |
+|--------|-------------|----------------|-------------------|-----------------|
+| **Force as mover** | Force sets velocity directly, replacing existing motion | `velocity_persistence` | Near 0 | Near 1 |
+| **Dying away** | Motion naturally dissipates without sustained force | `lateral_damping` | High (> 2) | Near 0 |
+| **Bigger means slower** | Heavier objects move more slowly under same force | `mass` | Overestimated | Correct |
+| **Closer means stronger** | Force effect depends on proximity, not just magnitude | `force_magnitude` | Distance-dependent | Constant |
+| **Continuing push** | Objects keep accelerating as long as force is "in them" | `force_duration` | Extended | Impulse only |
+| **Gravity as switch** | Gravity only acts when an object "should" fall (e.g. after reaching peak) | `gravity_onset` | Delayed | Always on |
+| **Straight then curve** | Object moves straight in force direction, then curves | `velocity_persistence` | Near 0 initially, increases | Constant near 1 |
+| **Heavier falls faster** | Mass affects fall rate in a vacuum | `mass` / `gravity` coupling | Strong coupling | Independent |
+
+For p-prims not in this table, reason about what model parameter(s) would need to differ from their Newtonian values to reproduce the alternative prediction, and add them to the mapping.
+
 ---
 
 ## 6. Worked Example: DiSessa Ball Scenario
 
 **Scenario**: A ball moves horizontally to the right. At a specific moment, a constant upward force is applied. What path does the ball follow?
 
-- **Naive prediction**: Ball goes straight up (force "replaces" velocity)
+- **Alternative prediction**: Ball goes straight up (force "replaces" velocity)
 - **Newtonian prediction**: Ball curves diagonally up-right (force "adds to" velocity)
+
+**Known p-prims for this scenario:**
+
+| P-prim | What it predicts | Parameter to check | Indicative value |
+|--------|-----------------|-------------------|-----------------|
+| Force as mover | Ball goes straight up — horizontal motion is "forgotten" when upward force is applied | `velocity_persistence` | < 0.3 (force replaces velocity) |
+| Dying away | Horizontal motion fades even without friction | `lateral_damping` | > 2.0 (motion dissipates quickly) |
 
 ### Complete MJCF
 
