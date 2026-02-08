@@ -77,29 +77,31 @@ The system has three services that run in Docker:
 flowchart TB
     subgraph browser["Browser — localhost:3000"]
         direction TB
-        subgraph top[""]
-            A1["Animation<br/>+ alternative overlay"]
-            A2["MuJoCo Code<br/>Editor"]
-            A3["Pyro Model<br/>Code Editor"]
+        subgraph row1[" "]
+            A1["Animation + alternative overlay"]
+            A2["MuJoCo Code Editor"]
+            A3["Pyro Model Code Editor"]
         end
-        subgraph bottom[""]
-            B1["Prior vs<br/>Posterior"]
-            B2["Trajectory<br/>Comparison"]
-            B3["Summary +<br/>Interpretation"]
+        subgraph row2[" "]
+            B1["Prior vs Posterior"]
+            B2["Trajectory Comparison"]
+            B3["Summary + Interpretation"]
         end
         tabs["Project Tabs — switch between scenarios"]
     end
 
     subgraph services["Docker Services"]
-        S["Simulator<br/><i>FastAPI + MuJoCo</i><br/>port 8001"]
-        I["Inference<br/><i>FastAPI + Pyro</i><br/>port 8002"]
+        S["Simulator — FastAPI + MuJoCo — port 8001"]
+        I["Inference — FastAPI + Pyro — port 8002"]
     end
 
-    browser -->|"/api/sim/*"| S
-    browser -->|"/api/infer/*"| I
+    browser -->|/api/sim| S
+    browser -->|/api/infer| I
 
     style browser fill:#1a1b26,stroke:#3b3d57,color:#c0caf5
     style services fill:#16161e,stroke:#3b3d57,color:#c0caf5
+    style row1 fill:#1a1b26,stroke:#2a2b3d,color:#565f89
+    style row2 fill:#1a1b26,stroke:#2a2b3d,color:#565f89
     style tabs fill:#2a2b3d,stroke:#7aa2f7,color:#7aa2f7
     style S fill:#2d333b,stroke:#7aa2f7,color:#c0caf5
     style I fill:#2d333b,stroke:#bb9af7,color:#c0caf5
