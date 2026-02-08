@@ -185,6 +185,23 @@ The MuJoCo XML is also editable. You can modify:
 - Object mass and size
 - Whether gravity is present (default: off, to isolate the force question)
 
+### Generating New MuJoCo Scenes with AI
+
+The repo includes a comprehensive MuJoCo generation guide at [`claude-mujoco-md/MUJOCO_GENERATION_GUIDE.md`](claude-mujoco-md/MUJOCO_GENERATION_GUIDE.md). To create custom physics scenarios:
+
+1. **Copy the guide** into a conversation with Claude (or any LLM)
+2. **Describe the scenario** you want — e.g. "a pendulum that gets hit by a ball" or "two objects on a ramp with different friction"
+3. **Paste the generated MJCF XML** into a new project tab in the dashboard and click Simulate
+
+The guide covers:
+- All MuJoCo geom types, joint types, actuators, and sensors
+- Material properties (friction, density, damping, contact)
+- Common scene patterns (projectiles, applied forces, ground planes, cameras)
+- A checklist of questions to specify (object shape, initial conditions, forces, physical properties)
+- A fully worked example (the DiSessa ball scenario) with simulation logic
+
+This lets you quickly prototype new physics misconception scenarios beyond the built-in DiSessa ball example — pendulums, collisions, circular motion, inclined planes, etc.
+
 ### Using Custom Trajectories
 
 The inference endpoint accepts custom observed trajectories. You could feed in:
