@@ -9,16 +9,16 @@ export const DEFAULT_DISESSA_PPRIM_CONFIG: PPrimConfig = {
       pprimName: 'Force as mover',
       description:
         'Controls what happens to existing velocity when a new force is applied. ' +
-        'At 0, the force completely replaces the current velocity (the ball forgets it was moving horizontally). ' +
+        'At 0, the force completely replaces the current velocity — like kicking a stationary ball, where it goes where you kick it. ' +
         'At 1, the force adds to the current velocity (Newtonian superposition).',
       priorDist: 'Beta(2,2)',
       priorMean: 0.5,
       range: [0, 1],
       color: '#7aa2f7',
       thresholds: [
-        { max: 0.3, label: "Force replaces velocity (alternative conception / 'force as mover' p-prim)", conception: 'alternative' },
+        { max: 0.3, label: "Force replaces velocity ('force as mover' p-prim active)", conception: 'alternative' },
         { min: 0.3, max: 0.7, label: 'Mixed beliefs — partial persistence', conception: 'mixed' },
-        { min: 0.7, label: "Force adds to velocity (Newtonian / 'force as deflector')", conception: 'newtonian' },
+        { min: 0.7, label: 'Force adds to velocity (Newtonian superposition)', conception: 'newtonian' },
       ],
       lowConclusion:
         "Strong evidence for the 'force as mover' p-prim — the person's predicted trajectory is best explained by a model where force replaces existing velocity.",
@@ -30,8 +30,8 @@ export const DEFAULT_DISESSA_PPRIM_CONFIG: PPrimConfig = {
       pprimName: 'Dying away',
       description:
         'Controls how quickly horizontal velocity decays over time, independent of velocity_persistence. ' +
-        'High values mean horizontal motion dies quickly even without a new force — like an implicit belief ' +
-        'that objects naturally stop moving (an Aristotelian intuition). Low values mean motion persists (Newton\'s first law).',
+        'High values mean horizontal motion dies quickly even without a new force — like the everyday experience ' +
+        'that a ball kicked across grass slows down on its own. Low values mean motion persists (Newton\'s first law).',
       priorDist: 'LogNormal(0,1)',
       priorMean: 1.65,
       range: [0, 10],
@@ -39,7 +39,7 @@ export const DEFAULT_DISESSA_PPRIM_CONFIG: PPrimConfig = {
       thresholds: [
         { max: 0.5, label: 'Low damping — motion persists (Newtonian)', conception: 'newtonian' },
         { min: 0.5, max: 2.0, label: 'Moderate damping', conception: 'mixed' },
-        { min: 2.0, label: 'High damping — motion dies quickly (Aristotelian)', conception: 'alternative' },
+        { min: 2.0, label: "High damping — motion dies quickly ('dying away' p-prim active)", conception: 'alternative' },
       ],
       lowConclusion:
         "Consistent with Newton's first law — objects in motion stay in motion.",

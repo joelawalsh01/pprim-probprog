@@ -12,11 +12,11 @@ import pyro
 import pyro.distributions as dist
 
 def physics_model(observed_trajectory, dt=0.01):
-    """Probabilistic model of naive physics beliefs.
+    """Probabilistic model of alternative physics beliefs.
 
     Parameters being inferred:
-    - velocity_persistence: 0 = force replaces velocity (naive), 1 = force adds (Newtonian)
-    - lateral_damping: how quickly horizontal velocity decays (high = naive belief)
+    - velocity_persistence: 0 = force replaces velocity (alternative), 1 = force adds (Newtonian)
+    - lateral_damping: how quickly horizontal velocity decays (high = alternative belief)
     - force_magnitude: perceived strength of the applied force
     - mass: perceived mass of the object
     - sigma: observation noise
@@ -112,7 +112,7 @@ def build_forward_model(
 
 
 def physics_model(observed_trajectory: torch.Tensor, dt: float = 0.01):
-    """Pyro probabilistic model of naive physics beliefs."""
+    """Pyro probabilistic model of alternative physics beliefs."""
     n_steps = observed_trajectory.shape[0]
 
     velocity_persistence = pyro.sample(
@@ -159,14 +159,14 @@ def physics_model(observed_trajectory: torch.Tensor, dt: float = 0.01):
     return positions
 
 
-def generate_naive_trajectory_tensor(
+def generate_alternative_trajectory_tensor(
     n_steps: int = 200,
     dt: float = 0.01,
     initial_vx: float = 3.0,
     force_magnitude: float = 10.0,
     mass: float = 1.0,
 ) -> torch.Tensor:
-    """Generate the naive trajectory as a tensor (ball goes straight up).
+    """Generate the alternative trajectory as a tensor (ball goes straight up).
 
     Returns (n_steps, 2) tensor of [x, z].
     """
@@ -184,7 +184,7 @@ def generate_naive_trajectory_tensor(
             accel_z = force_magnitude / mass
             vz += accel_z * dt
             z += vz * dt
-            # x stays fixed (naive belief: force replaces velocity)
+            # x stays fixed (alternative belief: force replaces velocity)
 
         positions[i, 0] = x
         positions[i, 1] = z

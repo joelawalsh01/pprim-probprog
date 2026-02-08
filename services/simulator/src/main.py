@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .simulation import SimConfig, run_simulation, run_simulation_batch, generate_naive_trajectory
+from .simulation import SimConfig, run_simulation, run_simulation_batch, generate_alternative_trajectory
 from .renderer import render_frames
 
 app = FastAPI(title="DiSessa Simulator", version="0.1.0")
@@ -115,7 +115,7 @@ def simulate(req: SimulateRequest):
             result["render_error"] = str(e)
 
     if req.include_naive:
-        result["naive_trajectory"] = generate_naive_trajectory(config)
+        result["naive_trajectory"] = generate_alternative_trajectory(config)
 
     return result
 

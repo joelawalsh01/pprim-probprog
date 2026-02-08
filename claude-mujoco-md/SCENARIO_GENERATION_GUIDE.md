@@ -1,6 +1,10 @@
 # Scenario Generation Guide
 
-A complete reference for generating physics misconception scenarios for the **pprim-probprog** dashboard. Paste this into a Claude conversation (or any LLM) to produce all three artifacts needed for a new scenario: MuJoCo XML, Pyro model code, and P-Prim config JSON.
+A complete reference for generating physics intuition scenarios for the **pprim-probprog** dashboard. Paste this into a Claude conversation (or any LLM) to produce all three artifacts needed for a new scenario: MuJoCo XML, Pyro model code, and P-Prim config JSON.
+
+---
+
+> **A note on interpretation:** This tool infers parameter values that are *consistent with* a given prediction — it finds evidence for or against p-prim activation in a particular context. It does not claim to directly measure a person's cognitive structures. P-prims are theoretical constructs (diSessa, 1993); the posteriors here represent the best-fitting parameters of a generative model, which we interpret through the lens of p-prim theory.
 
 ---
 
@@ -26,11 +30,12 @@ Ask (or accept) a description of the physics scenario:
 - What forces act on them?
 - What is the initial state and duration?
 
-### Step 2: Identify alternative conceptions
-Ask about known p-prims or alternative conceptions:
+### Step 2: Identify alternative conceptions and relevant p-prims
+Ask about the alternative prediction and which p-prims might be active:
 - What do students commonly predict for this scenario?
-- What is the Newtonian (correct) prediction?
-- What physical principle does the alternative conception violate?
+- What is the Newtonian prediction?
+- What physical principle is at issue in the alternative prediction?
+- Which p-prims (intuitive knowledge elements) might lead to this alternative prediction? (Note: p-prims are not the same as alternative conceptions — p-prims are small, context-sensitive intuitions that *produce* alternative predictions when activated in certain contexts.)
 
 ### Step 3: Design the parameter mapping
 For each alternative conception, identify:
@@ -199,7 +204,7 @@ The key insight: **each parameter should interpolate between an alternative conc
 
 #### Common Patterns
 
-| P-prim | Physical principle violated | Parameter | Alternative value | Newtonian value | Good prior |
+| P-prim | Physical principle at issue | Parameter | Alternative value | Newtonian value | Good prior |
 |--------|---------------------------|-----------|-------------------|-----------------|------------|
 | Force as mover | Superposition of forces | `velocity_persistence` | 0 (force replaces velocity) | 1 (force adds) | `Beta(2, 2)` on [0,1] |
 | Dying away | Newton's 1st law (inertia) | `lateral_damping` | High (>2) | ~0 | `LogNormal(0, 1)` |
@@ -388,11 +393,11 @@ import pyro
 import pyro.distributions as dist
 
 def physics_model(observed_trajectory, dt=0.01):
-    """Probabilistic model of naive physics beliefs.
+    """Probabilistic model of alternative physics beliefs.
 
     Parameters being inferred:
-    - velocity_persistence: 0 = force replaces velocity (naive), 1 = force adds (Newtonian)
-    - lateral_damping: how quickly horizontal velocity decays (high = naive belief)
+    - velocity_persistence: 0 = force replaces velocity (alternative), 1 = force adds (Newtonian)
+    - lateral_damping: how quickly horizontal velocity decays (high = alternative belief)
     - force_magnitude: perceived strength of the applied force
     - mass: perceived mass of the object
     - sigma: observation noise
@@ -468,9 +473,9 @@ Paste into the **Pyro Model > P-Prims** tab (click "Paste JSON"):
       "range": [0, 1],
       "color": "#7aa2f7",
       "thresholds": [
-        { "max": 0.3, "label": "Force replaces velocity (alternative conception / 'force as mover' p-prim)", "conception": "alternative" },
+        { "max": 0.3, "label": "Force replaces velocity ('force as mover' p-prim active)", "conception": "alternative" },
         { "min": 0.3, "max": 0.7, "label": "Mixed beliefs — partial persistence", "conception": "mixed" },
-        { "min": 0.7, "label": "Force adds to velocity (Newtonian / 'force as deflector')", "conception": "newtonian" }
+        { "min": 0.7, "label": "Force adds to velocity (Newtonian superposition)", "conception": "newtonian" }
       ],
       "lowConclusion": "Strong evidence for the 'force as mover' p-prim — the person's predicted trajectory is best explained by a model where force replaces existing velocity.",
       "highConclusion": "Beliefs broadly consistent with Newtonian mechanics — force adds to existing motion."
@@ -478,7 +483,7 @@ Paste into the **Pyro Model > P-Prims** tab (click "Paste JSON"):
     {
       "parameter": "lateral_damping",
       "pprimName": "Dying away",
-      "description": "Controls how quickly horizontal velocity decays over time. High values mean horizontal motion dies quickly — like an implicit belief that objects naturally stop moving (Aristotelian). Low values mean motion persists (Newton's first law).",
+      "description": "Controls how quickly horizontal velocity decays over time. High values mean horizontal motion dies quickly — like the everyday experience that a ball kicked across grass slows down on its own. Low values mean motion persists (Newton's first law).",
       "priorDist": "LogNormal(0,1)",
       "priorMean": 1.65,
       "range": [0, 10],
@@ -486,7 +491,7 @@ Paste into the **Pyro Model > P-Prims** tab (click "Paste JSON"):
       "thresholds": [
         { "max": 0.5, "label": "Low damping — motion persists (Newtonian)", "conception": "newtonian" },
         { "min": 0.5, "max": 2.0, "label": "Moderate damping", "conception": "mixed" },
-        { "min": 2.0, "label": "High damping — motion dies quickly (Aristotelian)", "conception": "alternative" }
+        { "min": 2.0, "label": "High damping — motion dies quickly ('dying away' p-prim active)", "conception": "alternative" }
       ],
       "lowConclusion": "Consistent with Newton's first law — objects in motion stay in motion.",
       "highConclusion": "The person expects horizontal motion to dissipate, as if objects naturally come to rest unless actively pushed."
@@ -535,7 +540,7 @@ Paste into the **Pyro Model > P-Prims** tab (click "Paste JSON"):
 
 ## Part 5: Common P-Prim Mappings Reference
 
-Use this table to quickly identify parameter designs for common alternative conceptions:
+Use this table to quickly identify parameter designs for common alternative conceptions. Note that p-prims (like "force as mover" or "dying away") are the *intuitive knowledge elements* that produce alternative predictions — they are not the predictions themselves. The same p-prim can produce different alternative predictions in different physical contexts.
 
 | P-prim | Description | Model parameter | Alternative value | Newtonian value | Prior |
 |--------|-------------|----------------|-------------------|-----------------|-------|
@@ -543,7 +548,7 @@ Use this table to quickly identify parameter designs for common alternative conc
 | **Dying away** | Motion naturally dissipates without sustained force | `lateral_damping` | High (>2) | Near 0 | `LogNormal(0,1)` |
 | **Bigger means slower** | Heavier objects move more slowly under same force | `mass_speed_coupling` | High | 0 | `LogNormal(0,1)` |
 | **Closer means stronger** | Force effect depends on proximity | `force_distance_decay` | High | 0 | `LogNormal(0,1)` |
-| **Continuing push** | Objects keep accelerating as long as force is "in them" | `force_persistence` | Extended | Impulse only | `LogNormal(0,1)` |
+| **Continuous force** | Force continues to act through an object after contact | `force_persistence` | Extended | Impulse only | `LogNormal(0,1)` |
 | **Gravity as switch** | Gravity only acts when object "should" fall | `gravity_delay` | Positive | 0 | `Exponential(1)` |
 | **Straight then curve** | Object moves straight first, then curves | `velocity_persistence` | Time-varying | Constant ~1 | `Beta(2,2)` |
 | **Heavier falls faster** | Mass affects fall rate in vacuum | `mass_gravity_coupling` | 1 (coupled) | 0 (independent) | `Beta(2,2)` |

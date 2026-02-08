@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from .models import (
     DEFAULT_MODEL_CODE,
-    generate_naive_trajectory_tensor,
+    generate_alternative_trajectory_tensor,
     generate_newtonian_trajectory_tensor,
 )
 from .inference import (
@@ -119,8 +119,8 @@ def infer(req: InferRequest):
         xz = [[p.get("x", 0), p.get("z", 0)] for p in req.observed_trajectory]
         observed = torch.tensor(xz, dtype=torch.float32)
     else:
-        # Generate naive trajectory (ball goes straight up)
-        observed = generate_naive_trajectory_tensor(
+        # Generate alternative trajectory (ball goes straight up)
+        observed = generate_alternative_trajectory_tensor(
             n_steps=req.n_trajectory_steps,
             dt=req.dt,
         )
@@ -326,15 +326,15 @@ def generate_interpretation(posterior: dict) -> dict:
             "shift": round(vp_mean - 0.5, 4),
             "rule": (
                 "This parameter controls what happens to existing velocity when a new force is applied. "
-                "At 0, the force completely replaces the current velocity (the ball forgets it was moving horizontally). "
-                "At 1, the force adds to the current velocity (Newtonian superposition). "
+                "At 0, the force completely replaces the current velocity — like kicking a stationary ball, "
+                "where it goes where you kick it. At 1, the force adds to the current velocity (Newtonian superposition). "
                 "In the model's forward simulation, horizontal velocity at each timestep is multiplied by "
                 "velocity_persistence — so values near 0 kill horizontal motion instantly."
             ),
             "thresholds": [
-                {"condition": "mean < 0.3", "triggered": vp_mean < 0.3, "label": "Force replaces velocity (alternative conception / 'force as mover' p-prim)"},
+                {"condition": "mean < 0.3", "triggered": vp_mean < 0.3, "label": "Force replaces velocity ('force as mover' p-prim active)"},
                 {"condition": "0.3 ≤ mean ≤ 0.7", "triggered": 0.3 <= vp_mean <= 0.7, "label": "Mixed beliefs — partial persistence"},
-                {"condition": "mean > 0.7", "triggered": vp_mean > 0.7, "label": "Force adds to velocity (Newtonian / 'force as deflector')"},
+                {"condition": "mean > 0.7", "triggered": vp_mean > 0.7, "label": "Force adds to velocity (Newtonian superposition)"},
             ],
             "conclusion": (
                 f"Posterior mean = {vp_mean:.3f} (shifted {'toward 0' if vp_mean < 0.5 else 'toward 1'} from prior mean of 0.5). "
@@ -383,13 +383,13 @@ def generate_interpretation(posterior: dict) -> dict:
                 "This parameter controls how quickly horizontal velocity decays over time, independent of "
                 "velocity_persistence. In the model, horizontal velocity is multiplied by exp(-lateral_damping × dt) "
                 "each timestep. High values mean horizontal motion dies quickly even without a new force — "
-                "like an implicit belief that objects naturally stop moving (an Aristotelian intuition). "
+                "like the everyday experience that a ball kicked across grass slows down on its own. "
                 "Low values mean motion persists (Newton's first law)."
             ),
             "thresholds": [
                 {"condition": "mean < 0.5", "triggered": ld_mean < 0.5, "label": "Low damping — motion persists (Newtonian)"},
                 {"condition": "0.5 ≤ mean ≤ 2.0", "triggered": 0.5 <= ld_mean <= 2.0, "label": "Moderate damping"},
-                {"condition": "mean > 2.0", "triggered": ld_mean > 2.0, "label": "High damping — motion dies quickly (Aristotelian)"},
+                {"condition": "mean > 2.0", "triggered": ld_mean > 2.0, "label": "High damping — motion dies quickly ('dying away' p-prim active)"},
             ],
             "conclusion": (
                 f"Posterior mean = {ld_mean:.3f}. "

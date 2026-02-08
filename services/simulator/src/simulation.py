@@ -129,10 +129,10 @@ def run_simulation_batch(
     return results
 
 
-def generate_naive_trajectory(config: SimConfig) -> list[dict]:
-    """Generate the naive trajectory analytically.
+def generate_alternative_trajectory(config: SimConfig) -> list[dict]:
+    """Generate the alternative trajectory analytically.
 
-    In the naive model, the ball moves horizontally until the force is applied,
+    In the alternative model, the ball moves horizontally until the force is applied,
     then moves straight up (force "replaces" velocity).
     """
     dt = config.duration / 200  # 200 points

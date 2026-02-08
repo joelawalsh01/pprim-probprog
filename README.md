@@ -1,8 +1,8 @@
 # pprim-probprog
 
-**Extracting Phenomenological Primitives Through Probabilistic Programming**
+**Inferring Phenomenological Primitive Activations Through Probabilistic Programming**
 
-A browser-based tool that uses analysis-by-synthesis to reverse-engineer the implicit physical beliefs (p-prims) behind alternative conceptions about motion. Built on a MuJoCo physics engine and Pyro probabilistic programming framework.
+A browser-based tool that uses analysis-by-synthesis to find evidence for phenomenological primitive (p-prim) activation in students' physics predictions. Built on a MuJoCo physics engine and Pyro probabilistic programming framework.
 
 ---
 
@@ -12,16 +12,18 @@ Imagine a ball rolling horizontally across a table. Suddenly, a constant upward 
 
 Most people — including many students — predict that the ball goes **straight up**. Newtonian mechanics says it should curve **diagonally**, because the upward force *adds to* the existing horizontal velocity rather than replacing it.
 
-This tool asks: **what implicit physical model would a person need to hold in order to expect the alternative (straight-up) outcome?** Rather than simply noting that the prediction is wrong, we use probabilistic inference to *quantify* the underlying beliefs.
+This tool asks: **what implicit physical model would a person need to hold in order to expect the alternative (straight-up) outcome?** Rather than simply noting that the prediction differs from Newtonian mechanics, we use probabilistic inference to *quantify* the underlying beliefs — finding evidence for which intuitive knowledge elements (p-prims) are active in a given context.
+
+> **Important caveat:** This tool infers parameter values *consistent with* a given prediction. It finds evidence for or against p-prim activation in a particular context — it does not claim to directly measure a person's cognitive structures. P-prims are theoretical constructs; the posteriors represent the best-fitting parameters of a generative model, interpreted through the lens of p-prim theory.
 
 ### The Connection to P-Prims
 
 DiSessa's phenomenological primitives (p-prims) are the small, intuitive knowledge elements people use to reason about the physical world. Two p-prims are particularly relevant here:
 
-- **"Force as mover"** — the intuition that a force *sets* an object's motion. If you push something up, it goes up. The prior motion is irrelevant.
-- **"Force as deflector"** — the Newtonian-consistent intuition that a force *changes* existing motion. The ball was already moving right; an upward push makes it go diagonally.
+- **"Force as mover"** — the intuition that a force *sets* an object's motion. If you push something up, it goes up. The prior motion is irrelevant. (Think of how we experience kicking a stationary ball — the ball goes where you kick it.)
+- **Newtonian superposition** — force *changes* existing motion rather than replacing it. The ball was already moving right; an upward push makes it go diagonally. (Note: this is the Newtonian principle itself, not a p-prim — p-prims are the intuitive elements that may or may not align with formal physics.)
 
-These p-prims aren't just qualitative labels. This tool shows that they correspond to specific, measurable values of parameters in a generative physical model. When someone predicts the alternative trajectory, their implicit `velocity_persistence` parameter is near 0 (force replaces velocity). When someone predicts the Newtonian trajectory, that same parameter is near 1 (force adds to velocity).
+P-prims aren't just qualitative labels. This tool shows that p-prim activation corresponds to specific, measurable values of parameters in a generative physical model. When someone predicts the alternative trajectory, their implicit `velocity_persistence` parameter is near 0 — evidence that the "force as mover" p-prim is active. When someone predicts the Newtonian trajectory, that same parameter is near 1 (consistent with Newtonian superposition). This operationalization gives p-prims a continuous, quantitative characterization rather than a binary label.
 
 ---
 
@@ -34,7 +36,7 @@ flowchart TD
     A["<b>Observed Behavior</b><br/><i>alternative prediction</i>"]
     B["<b>Probabilistic Model</b><br/>with learnable<br/>'cognitive physics' parameters"]
     C["<b>Bayesian Inference</b><br/>What parameter values<br/>explain this prediction?"]
-    D["<b>Posterior over<br/>Physical Beliefs</b><br/><i>extracted p-prims</i>"]
+    D["<b>Posterior over<br/>Physical Beliefs</b><br/><i>p-prim activation signatures</i>"]
 
     A --> B --> C --> D
 
@@ -50,7 +52,7 @@ flowchart TD
 
 3. **Bayesian inference searches** for parameter values that would produce this trajectory. It doesn't just find one answer — it finds a *distribution* of plausible values, telling us both what the person likely believes and how confident we can be.
 
-4. **The posterior distribution** directly maps to p-prim activations: a low `velocity_persistence` means the "force as mover" p-prim is active; a high value means "force as deflector."
+4. **The posterior distribution** provides evidence about p-prim activation: a low `velocity_persistence` is consistent with the "force as mover" p-prim being active; a high value is consistent with Newtonian superposition.
 
 ---
 
@@ -65,7 +67,7 @@ The probabilistic model exposes these "cognitive physics" parameters:
 | **force_magnitude** | How strong does the force feel? | Varies | Varies |
 | **mass** | How heavy does the object feel? | Varies | Varies |
 
-The first two parameters are the most diagnostic. Together, they capture the "force as mover" vs. "force as deflector" distinction in continuous, quantitative terms.
+The first two parameters are the most diagnostic. Together, they capture the "force as mover" p-prim activation vs. Newtonian superposition in continuous, quantitative terms.
 
 ---
 
@@ -151,7 +153,7 @@ Then open **http://localhost:3000**.
 
 4. **Explore the results:**
    - **Prior vs Posterior panel** — histograms showing how each parameter shifted from its prior. Look for `velocity_persistence` concentrating near 0.
-   - **Trajectory panel** — visual comparison of Newtonian (correct) vs alternative (predicted) paths.
+   - **Trajectory panel** — visual comparison of Newtonian vs alternative paths.
    - **Summary panel** — parameter estimates, convergence plot, and a plain-English interpretation of what the posteriors mean in terms of physical intuitions.
 
 ### Project Tabs
@@ -205,7 +207,7 @@ The guide covers:
 - A complete worked example (the DiSessa ball scenario) showing all three outputs
 - A reference table of common p-prim → parameter mappings
 
-This lets you prototype new physics misconception scenarios beyond the built-in DiSessa ball example — ramps, pendulums, collisions, circular motion, and more.
+This lets you prototype new physics intuition scenarios beyond the built-in DiSessa ball example — ramps, pendulums, collisions, circular motion, and more.
 
 ### Using Custom Trajectories
 
@@ -288,6 +290,8 @@ pprim-probprog/
 ## References
 
 - diSessa, A. A. (1993). Toward an epistemology of physics. *Cognition and Instruction*, 10(2-3), 105-225.
+- diSessa, A. A., & Sherin, B. L. (1998). What changes in conceptual change? *International Journal of Science Education*, 20(10), 1155-1191.
+- Smith, J. P., diSessa, A. A., & Roschelle, J. (1993). Misconceptions reconceived: A constructivist analysis of knowledge in transition. *Journal of the Learning Sciences*, 3(2), 115-163.
 - Battaglia, P. W., Hamrick, J. B., & Tenenbaum, J. B. (2013). Simulation as an engine of physical scene understanding. *PNAS*, 110(45), 18327-18332.
 - Goodman, N. D., & Stuhlmuller, A. (2014). *The Design and Implementation of Probabilistic Programming Languages.* http://dippl.org
 - Bingham, E., et al. (2019). Pyro: Deep Universal Probabilistic Programming. *JMLR*, 20(28), 1-6.
