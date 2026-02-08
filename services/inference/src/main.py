@@ -334,7 +334,7 @@ def generate_interpretation(posterior: dict) -> dict:
             "A person expecting this trajectory implicitly believes that force replaces "
             "velocity rather than adding to it. When the upward force is applied, they "
             "expect the horizontal motion to stop and the ball to go straight up. This "
-            "is the 'force as a mover' misconception identified by diSessa — treating "
+            "is the 'force as mover' alternative conception identified by diSessa — treating "
             "force as setting velocity directly rather than causing acceleration."
         )
     else:
