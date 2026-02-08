@@ -1,0 +1,40 @@
+<mujoco model="disessa_ball">
+  <option timestep="0.002" gravity="0 0 0" integrator="RK4"/>
+
+  <asset>
+    <texture name="grid" type="2d" builtin="checker" width="512" height="512"
+             rgb1="0.15 0.15 0.2" rgb2="0.2 0.2 0.25"/>
+    <material name="ground" texture="grid" texrepeat="8 8"
+              specular="0.3" shininess="0.3"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 5" dir="0 0 -1" diffuse="0.8 0.8 0.8" castshadow="false"/>
+    <light pos="0 -3 3" dir="0 0.5 -0.5" diffuse="0.4 0.4 0.5"/>
+
+    <!-- Ground reference plane (visual only) -->
+    <geom type="plane" size="5 5 0.01" material="ground" contype="0" conaffinity="0"/>
+
+    <!-- The ball -->
+    <body name="ball" pos="-2 0 0.5">
+      <joint type="free" damping="0"/>
+      <geom type="sphere" size="0.08" mass="1.0" rgba="0.2 0.6 1.0 1"
+            contype="0" conaffinity="0"/>
+      <site name="force_point" pos="0 0 0" size="0.01"/>
+    </body>
+
+    <!-- Cameras -->
+    <camera name="side" pos="0 -4 1.5" xyaxes="1 0 0 0 0.3 1"/>
+    <camera name="top" pos="0 0 5" xyaxes="1 0 0 0 1 0"/>
+  </worldbody>
+
+  <actuator>
+    <motor name="upward_force" site="force_point" gear="0 0 1 0 0 0"
+           ctrllimited="true" ctrlrange="0 50"/>
+  </actuator>
+
+  <sensor>
+    <framepos name="ball_pos" objtype="body" objname="ball"/>
+    <framevelocity name="ball_vel" objtype="body" objname="ball"/>
+  </sensor>
+</mujoco>

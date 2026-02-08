@@ -1,0 +1,82 @@
+import type { SimulationResult, InferenceResult, ExampleInfo, ModelInfo } from './types';
+
+const SIM_BASE = '/api/sim';
+const INFER_BASE = '/api/infer';
+
+async function fetchJSON<T>(url: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// Simulator API
+
+export async function getExamples(): Promise<{ examples: ExampleInfo[] }> {
+  return fetchJSON(`${SIM_BASE}/examples`);
+}
+
+export async function getExample(name: string): Promise<{ name: string; mjcf_xml: string }> {
+  return fetchJSON(`${SIM_BASE}/examples/${name}`);
+}
+
+export async function simulate(params: {
+  mjcf_xml: string;
+  duration?: number;
+  initial_vx?: number;
+  force_start_time?: number;
+  force_magnitude?: number;
+  damping?: number;
+  render_frames?: boolean;
+  max_frames?: number;
+  include_naive?: boolean;
+}): Promise<SimulationResult> {
+  return fetchJSON(`${SIM_BASE}/simulate`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+// Inference API
+
+export async function getModels(): Promise<{ models: ModelInfo[] }> {
+  return fetchJSON(`${INFER_BASE}/models`);
+}
+
+export async function runInference(params: {
+  trajectory_type?: string;
+  observed_trajectory?: { x: number; z: number }[];
+  model_code?: string;
+  method?: string;
+  num_steps?: number;
+  num_samples?: number;
+  learning_rate?: number;
+}): Promise<InferenceResult> {
+  return fetchJSON(`${INFER_BASE}/infer`, {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+}
+
+export async function priorPredictive(params?: {
+  num_samples?: number;
+}): Promise<{ trajectories: { t: number; x: number; z: number }[][]; num_samples: number }> {
+  return fetchJSON(`${INFER_BASE}/prior-predictive`, {
+    method: 'POST',
+    body: JSON.stringify(params || {}),
+  });
+}
+
+export async function posteriorPredictive(params?: {
+  num_samples?: number;
+}): Promise<{ trajectories: { t: number; x: number; z: number }[][]; num_samples: number }> {
+  return fetchJSON(`${INFER_BASE}/posterior-predictive`, {
+    method: 'POST',
+    body: JSON.stringify(params || {}),
+  });
+}
