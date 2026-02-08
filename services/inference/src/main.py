@@ -31,6 +31,32 @@ app.add_middleware(
 _latest_posterior: dict | None = None
 
 
+class PPrimThreshold(BaseModel):
+    min: float | None = None
+    max: float | None = None
+    label: str
+    conception: str = "neutral"  # "alternative" | "newtonian" | "mixed" | "neutral"
+
+
+class PPrimMapping(BaseModel):
+    parameter: str
+    pprim_name: str
+    description: str
+    prior_dist: str
+    prior_mean: float
+    range: tuple[float, float]
+    color: str | None = None
+    thresholds: list[PPrimThreshold] = []
+    low_conclusion: str
+    high_conclusion: str
+
+
+class PPrimConfig(BaseModel):
+    version: int = 1
+    summary_template: str | None = None
+    mappings: list[PPrimMapping] = []
+
+
 class InferRequest(BaseModel):
     observed_trajectory: list[dict] | None = None
     trajectory_type: str = "naive"  # "naive" or "custom"
@@ -41,6 +67,7 @@ class InferRequest(BaseModel):
     learning_rate: float = 0.01
     n_trajectory_steps: int = 200
     dt: float = 0.01
+    pprim_config: PPrimConfig | None = None
 
 
 class PriorPredictiveRequest(BaseModel):
@@ -139,7 +166,10 @@ def infer(req: InferRequest):
 
     # Generate interpretation
     posterior = result.get("posterior", {})
-    result["interpretation"] = generate_interpretation(posterior)
+    if req.pprim_config and req.pprim_config.mappings:
+        result["interpretation"] = generate_interpretation_from_config(posterior, req.pprim_config)
+    else:
+        result["interpretation"] = generate_interpretation(posterior)
 
     return result
 
@@ -168,6 +198,106 @@ def posterior_predictive(req: PosteriorPredictiveRequest):
         dt=req.dt,
     )
     return {"trajectories": trajectories, "num_samples": len(trajectories)}
+
+
+def generate_interpretation_from_config(posterior: dict, config: PPrimConfig) -> dict:
+    """Generate interpretation from a p-prim config (data-driven, not hardcoded)."""
+    findings = []
+    reasoning_steps = []
+    conception_votes: list[str] = []
+
+    for mapping in config.mappings:
+        param_data = posterior.get(mapping.parameter, {})
+        if not param_data:
+            continue
+
+        p_mean = param_data.get("mean", 0.0)
+        p_std = param_data.get("std", 0.0)
+        shift = p_mean - mapping.prior_mean
+
+        # Evaluate thresholds
+        triggered_thresholds = []
+        active_conception = "neutral"
+        active_label = ""
+        for t in mapping.thresholds:
+            lo = t.min if t.min is not None else float("-inf")
+            hi = t.max if t.max is not None else float("inf")
+            hit = lo <= p_mean <= hi
+            triggered_thresholds.append({
+                "condition": _format_condition(t.min, t.max),
+                "triggered": hit,
+                "label": t.label,
+            })
+            if hit:
+                active_conception = t.conception
+                active_label = t.label
+                conception_votes.append(t.conception)
+
+        # Build conclusion text
+        direction = "toward lower values" if shift < 0 else "toward higher values"
+        conclusion = f"Posterior mean = {p_mean:.3f} (shifted {direction} from prior mean of {mapping.prior_mean:.2f}). "
+        if p_mean <= mapping.prior_mean:
+            conclusion += mapping.low_conclusion
+        else:
+            conclusion += mapping.high_conclusion
+
+        reasoning_steps.append({
+            "parameter": mapping.parameter,
+            "pprim_name": mapping.pprim_name,
+            "prior": f"{mapping.prior_dist} — mean ≈ {mapping.prior_mean:.2f}",
+            "prior_mean": round(mapping.prior_mean, 4),
+            "posterior_mean": round(p_mean, 4),
+            "posterior_std": round(p_std, 4),
+            "shift": round(shift, 4),
+            "rule": mapping.description,
+            "thresholds": triggered_thresholds,
+            "conclusion": conclusion,
+        })
+
+        # Build finding text
+        if active_label:
+            findings.append(
+                f"{mapping.parameter} = {p_mean:.3f}: {active_label}"
+            )
+
+    # Generate summary from conception votes
+    alt_count = conception_votes.count("alternative")
+    newt_count = conception_votes.count("newtonian")
+    if config.summary_template:
+        summary = config.summary_template
+    elif alt_count > newt_count:
+        summary = (
+            "The posterior distributions suggest this person's mental model relies on "
+            "alternative conceptions — their predictions are best explained by non-Newtonian "
+            "physical intuitions."
+        )
+    elif newt_count > alt_count:
+        summary = (
+            "The inferred physics priors suggest this person's mental model partially "
+            "or fully incorporates Newtonian mechanics."
+        )
+    else:
+        summary = (
+            "The results show a mixed pattern — some parameters align with Newtonian "
+            "mechanics while others suggest alternative conceptions."
+        )
+
+    return {
+        "findings": findings,
+        "summary": summary,
+        "reasoning": reasoning_steps,
+    }
+
+
+def _format_condition(lo: float | None, hi: float | None) -> str:
+    """Format a threshold condition for display."""
+    if lo is not None and hi is not None:
+        return f"{lo} ≤ mean ≤ {hi}"
+    elif lo is not None:
+        return f"mean ≥ {lo}"
+    elif hi is not None:
+        return f"mean ≤ {hi}"
+    return "always"
 
 
 def generate_interpretation(posterior: dict) -> dict:

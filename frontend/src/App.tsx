@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Dashboard from './components/Dashboard';
-import type { SimulationResult, InferenceResult, Project } from './types';
+import type { SimulationResult, InferenceResult, Project, PPrimConfig } from './types';
 import { getExample, getModels, simulate, runInference } from './api';
+import { DEFAULT_DISESSA_PPRIM_CONFIG } from './defaults/pprimConfigs';
 
 const DEFAULT_EXAMPLE = 'disessa_ball';
 const STORAGE_KEY = 'disessa-balls-projects';
@@ -15,7 +16,12 @@ function loadProjects(): Project[] | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as Project[];
+    // Migration: add pprimConfig if missing on existing saved projects
+    return parsed.map(p => ({
+      ...p,
+      pprimConfig: p.pprimConfig !== undefined ? p.pprimConfig : null,
+    }));
   } catch {
     return null;
   }
@@ -85,7 +91,12 @@ export default function App() {
         // Update the DiSessa Ball project with fresh API data if it exists
         const updated = saved.map(p => {
           if (p.name === 'DiSessa Ball' && exampleMjcf !== FALLBACK_MJCF) {
-            return { ...p, mjcfXml: exampleMjcf, pyroCode: examplePyro };
+            return {
+              ...p,
+              mjcfXml: exampleMjcf,
+              pyroCode: examplePyro,
+              pprimConfig: p.pprimConfig ?? DEFAULT_DISESSA_PPRIM_CONFIG,
+            };
           }
           return p;
         });
@@ -102,6 +113,7 @@ export default function App() {
           name: 'DiSessa Ball',
           mjcfXml: exampleMjcf,
           pyroCode: examplePyro,
+          pprimConfig: DEFAULT_DISESSA_PPRIM_CONFIG,
           simResult: null,
           inferResult: null,
         };
@@ -142,6 +154,10 @@ export default function App() {
     updateActiveProject({ pyroCode: code });
   }, [updateActiveProject]);
 
+  const handlePPrimConfigChange = useCallback((config: PPrimConfig | null) => {
+    updateActiveProject({ pprimConfig: config });
+  }, [updateActiveProject]);
+
   const handleSimulate = useCallback(async () => {
     if (!activeProject) return;
     setSimLoading(true);
@@ -171,6 +187,7 @@ export default function App() {
         method: 'svi',
         num_steps: 500,
         model_code: activeProject.pyroCode,
+        pprim_config: activeProject.pprimConfig,
       });
       updateActiveProject({ inferResult: result });
     } catch (e: any) {
@@ -186,6 +203,7 @@ export default function App() {
       name: 'New Project',
       mjcfXml: TEMPLATE_MJCF,
       pyroCode: defaultPyroCode,
+      pprimConfig: null,
       simResult: null,
       inferResult: null,
     };
@@ -236,6 +254,8 @@ export default function App() {
       onMjcfChange={handleMjcfChange}
       pyroCode={activeProject.pyroCode}
       onPyroCodeChange={handlePyroCodeChange}
+      pprimConfig={activeProject.pprimConfig}
+      onPPrimConfigChange={handlePPrimConfigChange}
       simResult={activeProject.simResult}
       inferResult={activeProject.inferResult}
       onSimulate={handleSimulate}

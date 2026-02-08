@@ -1,4 +1,4 @@
-import type { SimulationResult, InferenceResult, ExampleInfo, ModelInfo } from './types';
+import type { SimulationResult, InferenceResult, ExampleInfo, ModelInfo, PPrimConfig } from './types';
 
 const SIM_BASE = '/api/sim';
 const INFER_BASE = '/api/infer';
@@ -48,6 +48,31 @@ export async function getModels(): Promise<{ models: ModelInfo[] }> {
   return fetchJSON(`${INFER_BASE}/models`);
 }
 
+/** Convert a PPrimConfig (camelCase frontend) to snake_case for the backend. */
+function pprimConfigToSnake(config: PPrimConfig) {
+  return {
+    version: config.version,
+    summary_template: config.summaryTemplate ?? null,
+    mappings: config.mappings.map(m => ({
+      parameter: m.parameter,
+      pprim_name: m.pprimName,
+      description: m.description,
+      prior_dist: m.priorDist,
+      prior_mean: m.priorMean,
+      range: m.range,
+      color: m.color ?? null,
+      thresholds: m.thresholds.map(t => ({
+        min: t.min ?? null,
+        max: t.max ?? null,
+        label: t.label,
+        conception: t.conception,
+      })),
+      low_conclusion: m.lowConclusion,
+      high_conclusion: m.highConclusion,
+    })),
+  };
+}
+
 export async function runInference(params: {
   trajectory_type?: string;
   observed_trajectory?: { x: number; z: number }[];
@@ -56,10 +81,16 @@ export async function runInference(params: {
   num_steps?: number;
   num_samples?: number;
   learning_rate?: number;
+  pprim_config?: PPrimConfig | null;
 }): Promise<InferenceResult> {
+  const { pprim_config, ...rest } = params;
+  const body: Record<string, unknown> = { ...rest };
+  if (pprim_config) {
+    body.pprim_config = pprimConfigToSnake(pprim_config);
+  }
   return fetchJSON(`${INFER_BASE}/infer`, {
     method: 'POST',
-    body: JSON.stringify(params),
+    body: JSON.stringify(body),
   });
 }
 

@@ -185,22 +185,27 @@ The MuJoCo XML is also editable. You can modify:
 - Object mass and size
 - Whether gravity is present (default: off, to isolate the force question)
 
-### Generating New MuJoCo Scenes with AI
+### Generating New Scenarios with AI
 
-The repo includes a comprehensive MuJoCo generation guide at [`claude-mujoco-md/MUJOCO_GENERATION_GUIDE.md`](claude-mujoco-md/MUJOCO_GENERATION_GUIDE.md). To create custom physics scenarios:
+The repo includes a comprehensive scenario generation guide at [`claude-mujoco-md/SCENARIO_GENERATION_GUIDE.md`](claude-mujoco-md/SCENARIO_GENERATION_GUIDE.md). To create complete custom scenarios:
 
 1. **Copy the guide** into a conversation with Claude (or any LLM)
-2. **Describe the scenario** you want — e.g. "a pendulum that gets hit by a ball" or "two objects on a ramp with different friction"
-3. **Paste the generated MJCF XML** into a new project tab in the dashboard and click Simulate
+2. **Describe the scenario** — e.g. "a ball on a ramp — students think heavier balls roll faster"
+3. **The LLM generates three outputs**: MuJoCo XML, Pyro model code, and a P-Prim config JSON
+4. **Paste each into the corresponding panel** in a new project tab:
+   - MJCF XML → MuJoCo Code panel
+   - Pyro model → Pyro Model > Code tab
+   - P-Prim config → Pyro Model > P-Prims tab (via "Paste JSON")
+5. **Click Simulate → Run Inference** → get meaningful p-prim interpretation
 
 The guide covers:
-- All MuJoCo geom types, joint types, actuators, and sensors
-- Material properties (friction, density, damping, contact)
-- Common scene patterns (projectiles, applied forces, ground planes, cameras)
-- A checklist of questions to specify (object shape, initial conditions, forces, physical properties)
-- A fully worked example (the DiSessa ball scenario) with simulation logic
+- MuJoCo MJCF XML generation (geom types, joints, actuators, sensors, cameras)
+- Pyro model design (how to map alternative conceptions to learnable parameters)
+- P-Prim config format (thresholds, conceptions, interpretation text)
+- A complete worked example (the DiSessa ball scenario) showing all three outputs
+- A reference table of common p-prim → parameter mappings
 
-This lets you quickly prototype new physics misconception scenarios beyond the built-in DiSessa ball example — pendulums, collisions, circular motion, inclined planes, etc.
+This lets you prototype new physics misconception scenarios beyond the built-in DiSessa ball example — ramps, pendulums, collisions, circular motion, and more.
 
 ### Using Custom Trajectories
 
@@ -251,7 +256,8 @@ Traditional analysis would classify a student's prediction as having an "alterna
 pprim-probprog/
 ├── docker-compose.yml              # Runs all 3 services
 ├── claude-mujoco-md/
-│   └── MUJOCO_GENERATION_GUIDE.md  # Reference for generating MuJoCo scenes
+│   ├── SCENARIO_GENERATION_GUIDE.md  # Complete guide for generating scenarios (MJCF + Pyro + P-Prims)
+│   └── MUJOCO_GENERATION_GUIDE.md    # Legacy MJCF-only reference
 ├── frontend/                       # React + Vite + TypeScript dashboard
 │   └── src/
 │       ├── App.tsx                 # Project state management + localStorage

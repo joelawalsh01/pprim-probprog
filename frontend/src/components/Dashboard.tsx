@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { SimulationResult, InferenceResult, Project } from '../types';
+import type { SimulationResult, InferenceResult, Project, PPrimConfig } from '../types';
 import AnimationPanel from './AnimationPanel';
 import MujocoCodePanel from './MujocoCodePanel';
 import PyroCodePanel from './PyroCodePanel';
@@ -18,6 +18,8 @@ interface Props {
   onMjcfChange: (xml: string) => void;
   pyroCode: string;
   onPyroCodeChange: (code: string) => void;
+  pprimConfig: PPrimConfig | null;
+  onPPrimConfigChange: (config: PPrimConfig | null) => void;
   simResult: SimulationResult | null;
   inferResult: InferenceResult | null;
   onSimulate: () => void;
@@ -266,12 +268,15 @@ export default function Dashboard(props: Props) {
         <PyroCodePanel
           code={props.pyroCode}
           onChange={props.onPyroCodeChange}
+          pprimConfig={props.pprimConfig}
+          onPPrimConfigChange={props.onPPrimConfigChange}
           onInfer={props.onInfer}
           loading={props.inferLoading}
         />
 
         <PriorPosteriorPanel
           posterior={props.inferResult?.posterior}
+          pprimConfig={props.pprimConfig}
         />
 
         <TrajectoryPanel

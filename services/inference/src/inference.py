@@ -40,20 +40,25 @@ def run_svi(
     predictive = Predictive(physics_model, guide=guide, num_samples=200)
     samples = predictive(observed_trajectory)
 
-    # Extract parameter samples
-    param_names = ["velocity_persistence", "lateral_damping", "force_magnitude", "mass", "sigma"]
+    # Extract parameter samples — discover names dynamically from samples dict
     posterior_samples = {}
-    for name in param_names:
-        if name in samples:
-            vals = samples[name].detach().numpy()
-            posterior_samples[name] = {
-                "samples": vals.tolist(),
-                "mean": float(np.mean(vals)),
-                "std": float(np.std(vals)),
-                "median": float(np.median(vals)),
-                "q05": float(np.percentile(vals, 5)),
-                "q95": float(np.percentile(vals, 95)),
-            }
+    for name, tensor in samples.items():
+        if name == "obs" or name.startswith("_"):
+            continue
+        vals = tensor.detach().numpy()
+        if vals.ndim == 0 or (vals.ndim == 1 and vals.shape[0] == 0):
+            continue
+        # Flatten multi-dim samples to 1D (e.g. from Predictive)
+        if vals.ndim > 1:
+            vals = vals.reshape(-1)
+        posterior_samples[name] = {
+            "samples": vals.tolist(),
+            "mean": float(np.mean(vals)),
+            "std": float(np.std(vals)),
+            "median": float(np.median(vals)),
+            "q05": float(np.percentile(vals, 5)),
+            "q95": float(np.percentile(vals, 95)),
+        }
 
     return {
         "method": "svi",
@@ -86,19 +91,23 @@ def run_mcmc(
 
     samples = mcmc.get_samples()
 
-    param_names = ["velocity_persistence", "lateral_damping", "force_magnitude", "mass", "sigma"]
     posterior_samples = {}
-    for name in param_names:
-        if name in samples:
-            vals = samples[name].detach().numpy()
-            posterior_samples[name] = {
-                "samples": vals.tolist(),
-                "mean": float(np.mean(vals)),
-                "std": float(np.std(vals)),
-                "median": float(np.median(vals)),
-                "q05": float(np.percentile(vals, 5)),
-                "q95": float(np.percentile(vals, 95)),
-            }
+    for name, tensor in samples.items():
+        if name == "obs" or name.startswith("_"):
+            continue
+        vals = tensor.detach().numpy()
+        if vals.ndim == 0 or (vals.ndim == 1 and vals.shape[0] == 0):
+            continue
+        if vals.ndim > 1:
+            vals = vals.reshape(-1)
+        posterior_samples[name] = {
+            "samples": vals.tolist(),
+            "mean": float(np.mean(vals)),
+            "std": float(np.std(vals)),
+            "median": float(np.median(vals)),
+            "q05": float(np.percentile(vals, 5)),
+            "q95": float(np.percentile(vals, 95)),
+        }
 
     return {
         "method": "mcmc",

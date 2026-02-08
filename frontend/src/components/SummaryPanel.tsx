@@ -125,8 +125,15 @@ function ReasoningView({ steps }: { steps: ReasoningStep[] }) {
                 textAlign: 'left',
               }}
             >
-              <span style={{ color: '#c0caf5', fontFamily: 'monospace', fontSize: '12px', fontWeight: 600 }}>
-                {step.parameter}
+              <span style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ color: '#c0caf5', fontFamily: 'monospace', fontSize: '12px', fontWeight: 600 }}>
+                  {step.parameter}
+                </span>
+                {step.pprim_name && (
+                  <span style={{ color: '#7aa2f7', fontSize: '10px', fontWeight: 400 }}>
+                    {step.pprim_name}
+                  </span>
+                )}
               </span>
               <span style={{ color: '#565f89', fontSize: '11px' }}>
                 {step.prior_mean.toFixed(2)} → {step.posterior_mean.toFixed(4)}

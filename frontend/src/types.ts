@@ -50,6 +50,7 @@ export interface InferenceResult {
 
 export interface ReasoningStep {
   parameter: string;
+  pprim_name?: string;
   prior: string;
   prior_mean: number;
   posterior_mean: number;
@@ -64,11 +65,38 @@ export interface ReasoningStep {
   conclusion: string;
 }
 
+export interface PPrimThreshold {
+  min?: number | null;
+  max?: number | null;
+  label: string;
+  conception: string; // "alternative" | "newtonian" | "mixed" | "neutral"
+}
+
+export interface PPrimMapping {
+  parameter: string;
+  pprimName: string;
+  description: string;
+  priorDist: string;
+  priorMean: number;
+  range: [number, number];
+  color?: string;
+  thresholds: PPrimThreshold[];
+  lowConclusion: string;
+  highConclusion: string;
+}
+
+export interface PPrimConfig {
+  version: number;
+  summaryTemplate?: string;
+  mappings: PPrimMapping[];
+}
+
 export interface Project {
   id: string;
   name: string;
   mjcfXml: string;
   pyroCode: string;
+  pprimConfig: PPrimConfig | null;
   simResult: SimulationResult | null;
   inferResult: InferenceResult | null;
 }
