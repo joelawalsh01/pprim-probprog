@@ -115,7 +115,17 @@ def simulate(req: SimulateRequest):
             result["render_error"] = str(e)
 
     if req.include_naive:
-        result["naive_trajectory"] = generate_alternative_trajectory(config)
+        # Extract ball's initial position from MJCF so alternative trajectory
+        # starts at the same point as the Newtonian simulation
+        initial_pos = None
+        try:
+            import mujoco
+            model = mujoco.MjModel.from_xml_string(req.mjcf_xml)
+            data = mujoco.MjData(model)
+            initial_pos = (float(data.qpos[0]), float(data.qpos[1]), float(data.qpos[2]))
+        except Exception:
+            pass
+        result["naive_trajectory"] = generate_alternative_trajectory(config, initial_pos)
 
     return result
 

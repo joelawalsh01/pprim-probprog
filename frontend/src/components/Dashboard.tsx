@@ -27,6 +27,11 @@ interface Props {
   simLoading: boolean;
   inferLoading: boolean;
   error: string | null;
+  onClearSimResult: () => void;
+  onClearInferResult: () => void;
+  onClearAllResults: () => void;
+  onClearMjcf: () => void;
+  onClearPyroCode: () => void;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -195,6 +200,7 @@ function ProjectTab({
 
 export default function Dashboard(props: Props) {
   const canClose = props.projects.length > 1;
+  const [animationProgress, setAnimationProgress] = useState(-1);
 
   return (
     <div style={styles.container}>
@@ -256,6 +262,8 @@ export default function Dashboard(props: Props) {
           trajectory={props.simResult?.trajectory}
           naiveTrajectory={props.simResult?.naive_trajectory}
           loading={props.simLoading}
+          onClear={props.onClearSimResult}
+          onAnimationProgress={setAnimationProgress}
         />
 
         <MujocoCodePanel
@@ -263,6 +271,7 @@ export default function Dashboard(props: Props) {
           onChange={props.onMjcfChange}
           onSimulate={props.onSimulate}
           loading={props.simLoading}
+          onClear={props.onClearMjcf}
         />
 
         <PyroCodePanel
@@ -272,22 +281,27 @@ export default function Dashboard(props: Props) {
           onPPrimConfigChange={props.onPPrimConfigChange}
           onInfer={props.onInfer}
           loading={props.inferLoading}
+          onClear={props.onClearPyroCode}
         />
 
         <PriorPosteriorPanel
           posterior={props.inferResult?.posterior}
           pprimConfig={props.pprimConfig}
+          onClear={props.onClearInferResult}
         />
 
         <TrajectoryPanel
           simTrajectory={props.simResult?.trajectory}
           naiveTrajectory={props.simResult?.naive_trajectory || props.inferResult?.observed_trajectory}
           newtonianTrajectory={props.inferResult?.newtonian_trajectory}
+          animationProgress={animationProgress}
+          onClear={props.onClearAllResults}
         />
 
         <SummaryPanel
           inferResult={props.inferResult}
           loading={props.inferLoading}
+          onClear={props.onClearInferResult}
         />
       </div>
     </div>

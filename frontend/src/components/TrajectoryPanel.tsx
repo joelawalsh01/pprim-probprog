@@ -10,6 +10,8 @@ interface Props {
   simTrajectory?: Point[];
   naiveTrajectory?: Point[];
   newtonianTrajectory?: Point[];
+  animationProgress: number; // 0–1 for progressive draw, -1 means no animation yet
+  onClear: () => void;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -30,7 +32,7 @@ const headerStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
-export default function TrajectoryPanel({ simTrajectory, naiveTrajectory, newtonianTrajectory }: Props) {
+export default function TrajectoryPanel({ simTrajectory, naiveTrajectory, newtonianTrajectory, animationProgress, onClear }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -51,11 +53,17 @@ export default function TrajectoryPanel({ simTrajectory, naiveTrajectory, newton
       ...(newtonianTrajectory || []),
     ];
 
-    if (all.length === 0) {
+    // Blank until animation has started
+    if (all.length === 0 || animationProgress < 0) {
       ctx.fillStyle = '#565f89';
       ctx.font = '13px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('Simulate and run inference to compare trajectories', w / 2, h / 2);
+      ctx.fillText(
+        all.length === 0
+          ? 'Simulate and run inference to compare trajectories'
+          : 'Play the animation to see trajectories',
+        w / 2, h / 2,
+      );
       return;
     }
 
@@ -91,13 +99,21 @@ export default function TrajectoryPanel({ simTrajectory, naiveTrajectory, newton
     ctx.fillText('z position', 0, 0);
     ctx.restore();
 
+    // Slice trajectory to current progress
+    function sliceToProgress(points: Point[]): Point[] {
+      if (animationProgress >= 1) return points;
+      const endIdx = Math.max(1, Math.ceil(animationProgress * points.length));
+      return points.slice(0, endIdx);
+    }
+
     function drawTraj(points: Point[], color: string, lineWidth: number, dash: number[] = []) {
-      if (points.length === 0) return;
+      const visible = sliceToProgress(points);
+      if (visible.length === 0) return;
       ctx!.beginPath();
       ctx!.strokeStyle = color;
       ctx!.lineWidth = lineWidth;
       ctx!.setLineDash(dash);
-      points.forEach((p, i) => {
+      visible.forEach((p, i) => {
         const cx = toX(p.x);
         const cz = toZ(p.z);
         if (i === 0) ctx!.moveTo(cx, cz);
@@ -105,6 +121,13 @@ export default function TrajectoryPanel({ simTrajectory, naiveTrajectory, newton
       });
       ctx!.stroke();
       ctx!.setLineDash([]);
+
+      // Draw ball at end of visible trail
+      const tip = visible[visible.length - 1];
+      ctx!.beginPath();
+      ctx!.arc(toX(tip.x), toZ(tip.z), 5, 0, Math.PI * 2);
+      ctx!.fillStyle = color;
+      ctx!.fill();
     }
 
     // Draw in order: sim, newtonian, naive
@@ -128,11 +151,30 @@ export default function TrajectoryPanel({ simTrajectory, naiveTrajectory, newton
       ctx.fillText(item.label, legendX + 16, legendY);
       legendX += ctx.measureText(item.label).width + 30;
     }
-  }, [simTrajectory, naiveTrajectory, newtonianTrajectory]);
+  }, [simTrajectory, naiveTrajectory, newtonianTrajectory, animationProgress]);
 
   return (
     <div style={panelStyle}>
-      <div style={headerStyle}>Trajectory Comparison</div>
+      <div style={{ ...headerStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>Trajectory Comparison</span>
+        {(simTrajectory || naiveTrajectory || newtonianTrajectory) && (
+          <button
+            onClick={() => { if (window.confirm('Clear all trajectory data?')) onClear(); }}
+            style={{
+              padding: '2px 8px',
+              fontSize: '11px',
+              background: 'transparent',
+              color: '#565f89',
+              border: '1px solid #2a2b3d',
+              borderRadius: '3px',
+              cursor: 'pointer',
+            }}
+            title="Clear trajectory data"
+          >
+            Clear
+          </button>
+        )}
+      </div>
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px' }}>
         <canvas
           ref={canvasRef}

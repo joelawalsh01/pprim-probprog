@@ -10,6 +10,7 @@ interface Props {
   onPPrimConfigChange: (config: PPrimConfig | null) => void;
   onInfer: () => void;
   loading: boolean;
+  onClear: () => void;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -481,7 +482,7 @@ function PPrimEditor({
   );
 }
 
-export default function PyroCodePanel({ code, onChange, pprimConfig, onPPrimConfigChange, onInfer, loading }: Props) {
+export default function PyroCodePanel({ code, onChange, pprimConfig, onPPrimConfigChange, onInfer, loading, onClear }: Props) {
   const [tab, setTab] = useState<'code' | 'pprims'>('code');
 
   return (
@@ -494,17 +495,34 @@ export default function PyroCodePanel({ code, onChange, pprimConfig, onPPrimConf
             <button style={tabBtnStyle(tab === 'pprims')} onClick={() => setTab('pprims')}>P-Prims</button>
           </div>
         </div>
-        <button
-          onClick={onInfer}
-          disabled={loading}
-          style={{
-            ...buttonStyle,
-            opacity: loading ? 0.6 : 1,
-            cursor: loading ? 'wait' : 'pointer',
-          }}
-        >
-          {loading ? 'Running Inference...' : 'Run Inference'}
-        </button>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <button
+            onClick={() => { if (window.confirm('Reset Pyro model code and p-prim config to defaults?')) onClear(); }}
+            style={{
+              padding: '2px 8px',
+              fontSize: '11px',
+              background: 'transparent',
+              color: '#565f89',
+              border: '1px solid #2a2b3d',
+              borderRadius: '3px',
+              cursor: 'pointer',
+            }}
+            title="Reset to defaults"
+          >
+            Clear
+          </button>
+          <button
+            onClick={onInfer}
+            disabled={loading}
+            style={{
+              ...buttonStyle,
+              opacity: loading ? 0.6 : 1,
+              cursor: loading ? 'wait' : 'pointer',
+            }}
+          >
+            {loading ? 'Running Inference...' : 'Run Inference'}
+          </button>
+        </div>
       </div>
       {tab === 'code' ? (
         <div style={{ flex: 1, overflow: 'hidden' }}>

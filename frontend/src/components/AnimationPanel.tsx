@@ -6,6 +6,8 @@ interface Props {
   trajectory?: TrajectoryPoint[];
   naiveTrajectory?: TrajectoryPoint[];
   loading: boolean;
+  onClear: () => void;
+  onAnimationProgress?: (progress: number) => void; // 0–1, -1 means no animation yet
 }
 
 const panelStyle: React.CSSProperties = {
@@ -29,14 +31,30 @@ const headerStyle: React.CSSProperties = {
   flexShrink: 0,
 };
 
-export default function AnimationPanel({ frames, trajectory, naiveTrajectory, loading }: Props) {
+function getVideoMimeType(): string | null {
+  const candidates = [
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+    'video/mp4',
+  ];
+  for (const mime of candidates) {
+    if (MediaRecorder.isTypeSupported(mime)) return mime;
+  }
+  return null;
+}
+
+
+export default function AnimationPanel({ frames, trajectory, naiveTrajectory, loading, onClear, onAnimationProgress }: Props) {
   const [frameIdx, setFrameIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [showNaive, setShowNaive] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<number | null>(null);
 
-  // Draw current frame + trajectory overlay
+  // Draw current frame — always 2D canvas with both balls
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -45,93 +63,253 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
 
     const w = canvas.width;
     const h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
 
-    if (frames && frames.length > 0 && frameIdx < frames.length) {
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, w, h);
-        drawTrajectoryOverlay(ctx, w, h);
-      };
-      img.src = `data:image/png;base64,${frames[frameIdx]}`;
-    } else {
-      // No frames — draw trajectory visualization
-      ctx.fillStyle = '#1a1b26';
-      ctx.fillRect(0, 0, w, h);
-      drawTrajectoryOverlay(ctx, w, h);
+    ctx.fillStyle = '#1a1b26';
+    ctx.fillRect(0, 0, w, h);
 
-      if (!trajectory && !loading) {
-        ctx.fillStyle = '#565f89';
-        ctx.font = '14px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Click "Simulate" to run', w / 2, h / 2);
-      }
-      if (loading) {
-        ctx.fillStyle = '#7aa2f7';
-        ctx.font = '14px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Simulating...', w / 2, h / 2);
-      }
+    if (frames && frames.length > 0) {
+      drawTrajectoryOverlay(ctx, w, h, frameIdx, frames.length, true);
+    } else if (loading) {
+      ctx.fillStyle = '#7aa2f7';
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Simulating...', w / 2, h / 2);
+    } else if (!trajectory) {
+      ctx.fillStyle = '#565f89';
+      ctx.font = '14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Click "Simulate" to run', w / 2, h / 2);
     }
   }, [frames, frameIdx, trajectory, naiveTrajectory, showNaive, loading]);
 
-  function drawTrajectoryOverlay(ctx: CanvasRenderingContext2D, w: number, h: number) {
-    if (!trajectory || trajectory.length === 0) return;
+  // Report animation progress to parent
+  useEffect(() => {
+    if (!onAnimationProgress) return;
+    if (!frames || frames.length === 0) {
+      onAnimationProgress(-1);
+    } else if (playing || exporting) {
+      onAnimationProgress(frameIdx / (frames.length - 1));
+    } else if (frameIdx >= frames.length - 1) {
+      // Finished playing — show full trajectory
+      onAnimationProgress(1);
+    }
+  }, [frameIdx, frames, playing, exporting, onAnimationProgress]);
 
-    // Compute bounds for mapping
+  // Compute coordinate mapping from trajectory bounds to canvas pixels.
+  // Uses all trajectories (Newtonian + alternative) for consistent bounds.
+  function getTrajectoryMapping(w: number, h: number) {
+    if (!trajectory || trajectory.length === 0) return null;
     const allPoints = [...trajectory, ...(showNaive && naiveTrajectory ? naiveTrajectory : [])];
     const xs = allPoints.map(p => p.x);
     const zs = allPoints.map(p => p.z);
     const xMin = Math.min(...xs) - 0.5;
     const xMax = Math.max(...xs) + 0.5;
-    const zMin = Math.min(...zs) - 0.5;
+    // Extra space below for the incoming "shove" ball
+    const zRange = Math.max(...zs) - Math.min(...zs);
+    const zMin = Math.min(...zs) - Math.max(0.5, zRange * 0.4);
     const zMax = Math.max(...zs) + 0.5;
-
     const margin = 40;
-    const toCanvasX = (x: number) => margin + ((x - xMin) / (xMax - xMin)) * (w - 2 * margin);
-    const toCanvasZ = (z: number) => h - margin - ((z - zMin) / (zMax - zMin)) * (h - 2 * margin);
+    return {
+      toCanvasX: (x: number) => margin + ((x - xMin) / (xMax - xMin)) * (w - 2 * margin),
+      toCanvasZ: (z: number) => h - margin - ((z - zMin) / (zMax - zMin)) * (h - 2 * margin),
+      margin,
+    };
+  }
 
-    // Draw Newtonian trajectory (solid blue)
-    ctx.beginPath();
-    ctx.strokeStyle = '#7aa2f7';
-    ctx.lineWidth = 2.5;
-    trajectory.forEach((p, i) => {
-      const cx = toCanvasX(p.x);
-      const cy = toCanvasZ(p.z);
-      if (i === 0) ctx.moveTo(cx, cy);
-      else ctx.lineTo(cx, cy);
-    });
-    ctx.stroke();
+  // Draw both balls with ghost trails, diSessa-diagram style.
+  // Both start at same point, travel together, then diverge at the force point.
+  function drawTrajectoryOverlay(
+    ctx: CanvasRenderingContext2D, w: number, h: number,
+    currentFrame?: number, totalFrames?: number,
+    progressive?: boolean,
+  ) {
+    if (!trajectory || trajectory.length === 0) return;
 
-    // Draw ball at current animation position
-    if (frames && frames.length > 0) {
-      const progress = frameIdx / (frames.length - 1);
-      const idx = Math.floor(progress * (trajectory.length - 1));
-      const p = trajectory[idx];
+    const fIdx = currentFrame ?? frameIdx;
+    const fTotal = totalFrames ?? (frames?.length ?? 0);
+    const mapping = getTrajectoryMapping(w, h);
+    if (!mapping) return;
+    const { toCanvasX, toCanvasZ, margin } = mapping;
+
+    const progress = fTotal > 1 ? fIdx / (fTotal - 1) : 1;
+    const ballRadius = 12;
+    const ghostRadius = 8;
+    const ghostCount = 8;
+
+    // Draw a 3D-looking sphere with radial gradient, highlight, and shadow
+    function drawSphere(
+      cx: number, cy: number, r: number,
+      baseColor: string, highlightColor: string, shadowColor: string,
+      alpha: number = 1,
+    ) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      // Drop shadow
       ctx.beginPath();
-      ctx.arc(toCanvasX(p.x), toCanvasZ(p.z), 6, 0, Math.PI * 2);
-      ctx.fillStyle = '#7aa2f7';
+      ctx.arc(cx + 1, cy + 2, r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
       ctx.fill();
+
+      // Main sphere gradient — light source top-left
+      const grad = ctx.createRadialGradient(
+        cx - r * 0.3, cy - r * 0.3, r * 0.1,
+        cx, cy, r,
+      );
+      grad.addColorStop(0, highlightColor);
+      grad.addColorStop(0.6, baseColor);
+      grad.addColorStop(1, shadowColor);
+
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Specular highlight
+      ctx.beginPath();
+      ctx.arc(cx - r * 0.25, cy - r * 0.25, r * 0.3, 0, Math.PI * 2);
+      const specGrad = ctx.createRadialGradient(
+        cx - r * 0.25, cy - r * 0.25, 0,
+        cx - r * 0.25, cy - r * 0.25, r * 0.3,
+      );
+      specGrad.addColorStop(0, 'rgba(255,255,255,0.6)');
+      specGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = specGrad;
+      ctx.fill();
+
+      ctx.restore();
     }
 
-    // Draw naive trajectory (dotted red)
-    if (showNaive && naiveTrajectory && naiveTrajectory.length > 0) {
+    // Draw an outlined ghost sphere (for alternative trail)
+    function drawGhostSphere(
+      cx: number, cy: number, r: number,
+      baseColor: string, highlightColor: string,
+      alpha: number = 0.35,
+    ) {
+      ctx.save();
+      ctx.globalAlpha = alpha;
+
+      const grad = ctx.createRadialGradient(
+        cx - r * 0.3, cy - r * 0.3, r * 0.1,
+        cx, cy, r,
+      );
+      grad.addColorStop(0, highlightColor);
+      grad.addColorStop(1, baseColor);
+
       ctx.beginPath();
-      ctx.strokeStyle = '#f7768e';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      naiveTrajectory.forEach((p, i) => {
-        const cx = toCanvasX(p.x);
-        const cy = toCanvasZ(p.z);
-        if (i === 0) ctx.moveTo(cx, cy);
-        else ctx.lineTo(cx, cy);
-      });
-      ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Helper: get trajectory index for current progress
+    function endIdx(pts: TrajectoryPoint[]) {
+      return progressive
+        ? Math.min(Math.floor(progress * (pts.length - 1)), pts.length - 1)
+        : pts.length - 1;
+    }
+
+    const newtonEnd = endIdx(trajectory);
+
+    // Newtonian ghost trail + current ball
+    {
+      const step = Math.max(1, Math.floor(newtonEnd / ghostCount));
+      for (let i = step; i < newtonEnd; i += step) {
+        const px = toCanvasX(trajectory[i].x);
+        const pz = toCanvasZ(trajectory[i].z);
+        const fade = 0.15 + 0.2 * (i / newtonEnd);
+        drawGhostSphere(px, pz, ghostRadius, '#4a6aaf', '#8ab4ff', fade);
+      }
+      const p = trajectory[newtonEnd];
+      drawSphere(
+        toCanvasX(p.x), toCanvasZ(p.z), ballRadius,
+        '#5b8af7', '#b0d0ff', '#2a4a9a',
+      );
+    }
+
+    // Alternative ghost trail + current ball
+    if (showNaive && naiveTrajectory && naiveTrajectory.length > 0) {
+      const naiveEnd = endIdx(naiveTrajectory);
+      const step = Math.max(1, Math.floor(naiveEnd / ghostCount));
+      for (let i = step; i < naiveEnd; i += step) {
+        const px = toCanvasX(naiveTrajectory[i].x);
+        const pz = toCanvasZ(naiveTrajectory[i].z);
+        const fade = 0.15 + 0.2 * (i / naiveEnd);
+        drawGhostSphere(px, pz, ghostRadius, '#af4a5a', '#ff8a9a', fade);
+      }
+      const p = naiveTrajectory[naiveEnd];
+      drawSphere(
+        toCanvasX(p.x), toCanvasZ(p.z), ballRadius,
+        '#f7687e', '#ffb0c0', '#9a2a3a',
+      );
+    }
+
+    // "Shove" ball — approaches from below and hits at the divergence point.
+    // Like the diSessa diagram: a second ball causes the upward force.
+    if (naiveTrajectory && naiveTrajectory.length > 1 && trajectory.length > 1) {
+      // Find force time: the moment the alternative trajectory's z starts changing
+      // (before force, z is constant; after force, z increases)
+      const baseZ = naiveTrajectory[0].z;
+      let forceTime = naiveTrajectory[naiveTrajectory.length - 1].t;
+      for (let i = 1; i < naiveTrajectory.length; i++) {
+        if (Math.abs(naiveTrajectory[i].z - baseZ) > 0.01) {
+          forceTime = naiveTrajectory[Math.max(0, i - 1)].t;
+          break;
+        }
+      }
+
+      // Find the corresponding index in the Newtonian trajectory
+      let forceIdx = 0;
+      for (let i = 0; i < trajectory.length; i++) {
+        if (trajectory[i].t >= forceTime) {
+          forceIdx = i;
+          break;
+        }
+      }
+
+      // Force progress: what fraction of the way to the hit point are we?
+      const forceProgress = forceIdx > 0
+        ? Math.min(1, (progress * (trajectory.length - 1)) / forceIdx)
+        : 1;
+
+      const hitPoint = trajectory[forceIdx];
+      const hitX = toCanvasX(hitPoint.x);
+      const hitZ = toCanvasZ(hitPoint.z);
+
+      // Shove ball travels vertically from well below up to the hit point
+      const startBelow = 120; // pixels below the hit point
+      const shoveColor = '#e0af68';
+
+      if (forceProgress < 1) {
+        // Ball is approaching — draw it rising from below
+        const shoveY = hitZ + startBelow * (1 - forceProgress);
+        // Ghost trail for the shove ball
+        const shoveGhosts = 4;
+        for (let g = 0; g < shoveGhosts; g++) {
+          const gProgress = (forceProgress * g) / shoveGhosts;
+          const gy = hitZ + startBelow * (1 - gProgress);
+          if (gy > hitZ) {
+            const fade = 0.1 + 0.15 * (g / shoveGhosts);
+            drawGhostSphere(hitX, gy, ghostRadius, '#a08030', '#f0d090', fade);
+          }
+        }
+        // Current shove ball position
+        drawSphere(hitX, shoveY, ballRadius, '#e0af68', '#fff0c0', '#8a6a20');
+      } else {
+        // After hit — ball stopped at the hit point, show "F" label
+        drawSphere(hitX, hitZ + ballRadius * 2 + 4, ballRadius * 0.7, '#e0af68', '#fff0c0', '#8a6a20', 0.5);
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = '#e0af68';
+        ctx.textAlign = 'center';
+        ctx.fillText('F', hitX, hitZ + ballRadius * 2 + 8);
+      }
     }
 
     // Legend
     ctx.font = '11px sans-serif';
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#7aa2f7';
     ctx.fillText('Newtonian', margin, 20);
     if (showNaive) {
@@ -163,6 +341,67 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     };
   }, []);
 
+  const exportVideo = useCallback(async () => {
+    const canvas = canvasRef.current;
+    if (!canvas || !frames || frames.length === 0) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const mimeType = getVideoMimeType();
+    if (!mimeType) return;
+
+    setExporting(true);
+    setExportProgress(0);
+
+    const stream = canvas.captureStream(0);
+    const recorder = new MediaRecorder(stream, { mimeType });
+    const chunks: Blob[] = [];
+
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+
+    const done = new Promise<Blob>((resolve) => {
+      recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+    });
+
+    recorder.start();
+
+    const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const w = canvas.width;
+    const h = canvas.height;
+
+    for (let i = 0; i < frames.length; i++) {
+      // Clean dark background — no MuJoCo frames, just the balls + trails
+      ctx.fillStyle = '#1a1b26';
+      ctx.fillRect(0, 0, w, h);
+      drawTrajectoryOverlay(ctx, w, h, i, frames.length, true);
+
+      const track = stream.getVideoTracks()[0];
+      if (track && 'requestFrame' in track) {
+        (track as unknown as { requestFrame(): void }).requestFrame();
+      }
+      setExportProgress((i + 1) / frames.length);
+      await delay(50);
+    }
+
+    recorder.stop();
+    const blob = await done;
+
+    const ext = mimeType.startsWith('video/mp4') ? 'mp4' : 'webm';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `simulation.${ext}`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Restore canvas to current displayed frame
+    setExporting(false);
+  }, [frames, frameIdx, trajectory, naiveTrajectory, showNaive]);
+
+  const canExport = typeof MediaRecorder !== 'undefined' && getVideoMimeType() !== null;
+
   return (
     <div style={panelStyle}>
       <div style={headerStyle}>
@@ -180,18 +419,53 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
           {frames && frames.length > 0 && (
             <button
               onClick={play}
-              disabled={playing}
+              disabled={playing || exporting}
               style={{
                 padding: '2px 10px',
                 fontSize: '11px',
-                background: playing ? '#2a2b3d' : '#364a82',
+                background: playing || exporting ? '#2a2b3d' : '#364a82',
                 color: '#c0caf5',
                 border: 'none',
                 borderRadius: '3px',
-                cursor: playing ? 'default' : 'pointer',
+                cursor: playing || exporting ? 'default' : 'pointer',
               }}
             >
               {playing ? 'Playing...' : 'Play'}
+            </button>
+          )}
+          {frames && frames.length > 0 && canExport && (
+            <button
+              onClick={exportVideo}
+              disabled={playing || exporting}
+              style={{
+                padding: '2px 10px',
+                fontSize: '11px',
+                background: exporting ? '#2a2b3d' : '#364a82',
+                color: '#c0caf5',
+                border: 'none',
+                borderRadius: '3px',
+                cursor: playing || exporting ? 'default' : 'pointer',
+              }}
+            >
+              {exporting ? `Exporting ${Math.round(exportProgress * 100)}%...` : 'Download'}
+            </button>
+          )}
+          {(frames || trajectory) && (
+            <button
+              onClick={() => { if (window.confirm('Clear simulation results?')) onClear(); }}
+              disabled={exporting}
+              style={{
+                padding: '2px 8px',
+                fontSize: '11px',
+                background: 'transparent',
+                color: '#565f89',
+                border: '1px solid #2a2b3d',
+                borderRadius: '3px',
+                cursor: exporting ? 'default' : 'pointer',
+              }}
+              title="Clear simulation results"
+            >
+              Clear
             </button>
           )}
         </div>

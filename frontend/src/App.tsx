@@ -146,6 +146,26 @@ export default function App() {
     ));
   }, [activeProjectId]);
 
+  const handleClearSimResult = useCallback(() => {
+    updateActiveProject({ simResult: null });
+  }, [updateActiveProject]);
+
+  const handleClearInferResult = useCallback(() => {
+    updateActiveProject({ inferResult: null });
+  }, [updateActiveProject]);
+
+  const handleClearAllResults = useCallback(() => {
+    updateActiveProject({ simResult: null, inferResult: null });
+  }, [updateActiveProject]);
+
+  const handleClearMjcf = useCallback(() => {
+    updateActiveProject({ mjcfXml: TEMPLATE_MJCF });
+  }, [updateActiveProject]);
+
+  const handleClearPyroCode = useCallback(() => {
+    updateActiveProject({ pyroCode: defaultPyroCode, pprimConfig: null });
+  }, [updateActiveProject, defaultPyroCode]);
+
   const handleMjcfChange = useCallback((xml: string) => {
     updateActiveProject({ mjcfXml: xml });
   }, [updateActiveProject]);
@@ -263,6 +283,11 @@ export default function App() {
       simLoading={simLoading}
       inferLoading={inferLoading}
       error={error}
+      onClearSimResult={handleClearSimResult}
+      onClearInferResult={handleClearInferResult}
+      onClearAllResults={handleClearAllResults}
+      onClearMjcf={handleClearMjcf}
+      onClearPyroCode={handleClearPyroCode}
     />
   );
 }
@@ -272,10 +297,7 @@ const FALLBACK_MJCF = `<mujoco model="disessa_ball">
   <option timestep="0.002" gravity="0 0 0" integrator="RK4"/>
 
   <asset>
-    <texture name="grid" type="2d" builtin="checker" width="512" height="512"
-             rgb1="0.15 0.15 0.2" rgb2="0.2 0.2 0.25"/>
-    <material name="ground" texture="grid" texrepeat="8 8"
-              specular="0.3" shininess="0.3"/>
+    <material name="ground" rgba="0.12 0.12 0.18 1" specular="0" shininess="0"/>
   </asset>
 
   <worldbody>

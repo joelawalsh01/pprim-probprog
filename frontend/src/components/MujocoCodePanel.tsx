@@ -7,6 +7,7 @@ interface Props {
   onChange: (xml: string) => void;
   onSimulate: () => void;
   loading: boolean;
+  onClear: () => void;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -41,22 +42,39 @@ const buttonStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-export default function MujocoCodePanel({ xml, onChange, onSimulate, loading }: Props) {
+export default function MujocoCodePanel({ xml, onChange, onSimulate, loading, onClear }: Props) {
   return (
     <div style={panelStyle}>
       <div style={headerStyle}>
         <span>MuJoCo MJCF</span>
-        <button
-          onClick={onSimulate}
-          disabled={loading}
-          style={{
-            ...buttonStyle,
-            opacity: loading ? 0.6 : 1,
-            cursor: loading ? 'wait' : 'pointer',
-          }}
-        >
-          {loading ? 'Simulating...' : 'Simulate'}
-        </button>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <button
+            onClick={() => { if (window.confirm('Reset MJCF XML to template?')) onClear(); }}
+            style={{
+              padding: '2px 8px',
+              fontSize: '11px',
+              background: 'transparent',
+              color: '#565f89',
+              border: '1px solid #2a2b3d',
+              borderRadius: '3px',
+              cursor: 'pointer',
+            }}
+            title="Reset to template"
+          >
+            Clear
+          </button>
+          <button
+            onClick={onSimulate}
+            disabled={loading}
+            style={{
+              ...buttonStyle,
+              opacity: loading ? 0.6 : 1,
+              cursor: loading ? 'wait' : 'pointer',
+            }}
+          >
+            {loading ? 'Simulating...' : 'Simulate'}
+          </button>
+        </div>
       </div>
       <div style={{ flex: 1, overflow: 'hidden' }}>
         <Suspense fallback={

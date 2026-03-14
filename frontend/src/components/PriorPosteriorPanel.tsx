@@ -6,6 +6,7 @@ const AUTO_COLORS = ['#7aa2f7', '#f7768e', '#9ece6a', '#e0af68', '#bb9af7', '#73
 interface Props {
   posterior?: Record<string, ParameterSummary>;
   pprimConfig?: PPrimConfig | null;
+  onClear: () => void;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -54,7 +55,7 @@ function MiniHistogram({ samples, color, range }: { samples: number[]; color: st
   );
 }
 
-export default function PriorPosteriorPanel({ posterior, pprimConfig }: Props) {
+export default function PriorPosteriorPanel({ posterior, pprimConfig, onClear }: Props) {
   const params = posterior ? Object.entries(posterior) : [];
 
   // Build lookup from config
@@ -64,7 +65,26 @@ export default function PriorPosteriorPanel({ posterior, pprimConfig }: Props) {
 
   return (
     <div style={panelStyle}>
-      <div style={headerStyle}>Prior vs Posterior</div>
+      <div style={{ ...headerStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>Prior vs Posterior</span>
+        {posterior && Object.keys(posterior).length > 0 && (
+          <button
+            onClick={() => { if (window.confirm('Clear inference results?')) onClear(); }}
+            style={{
+              padding: '2px 8px',
+              fontSize: '11px',
+              background: 'transparent',
+              color: '#565f89',
+              border: '1px solid #2a2b3d',
+              borderRadius: '3px',
+              cursor: 'pointer',
+            }}
+            title="Clear inference results"
+          >
+            Clear
+          </button>
+        )}
+      </div>
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 12px' }}>
         {params.length === 0 ? (
           <div style={{ color: '#565f89', fontSize: '13px', textAlign: 'center', paddingTop: '40px' }}>

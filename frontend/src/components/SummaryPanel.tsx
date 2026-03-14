@@ -4,6 +4,7 @@ import type { InferenceResult, ReasoningStep } from '../types';
 interface Props {
   inferResult: InferenceResult | null;
   loading: boolean;
+  onClear: () => void;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -323,7 +324,7 @@ function SummaryView({ inferResult }: { inferResult: InferenceResult }) {
   );
 }
 
-export default function SummaryPanel({ inferResult, loading }: Props) {
+export default function SummaryPanel({ inferResult, loading, onClear }: Props) {
   const [tab, setTab] = useState<'summary' | 'reasoning'>('summary');
 
   if (loading) {
@@ -361,12 +362,30 @@ export default function SummaryPanel({ inferResult, loading }: Props) {
     <div style={panelStyle}>
       <div style={headerStyle}>
         <span>Summary</span>
-        {hasReasoning && (
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <TabButton active={tab === 'summary'} onClick={() => setTab('summary')}>Results</TabButton>
-            <TabButton active={tab === 'reasoning'} onClick={() => setTab('reasoning')}>Reasoning</TabButton>
-          </div>
-        )}
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          {hasReasoning && (
+            <>
+              <TabButton active={tab === 'summary'} onClick={() => setTab('summary')}>Results</TabButton>
+              <TabButton active={tab === 'reasoning'} onClick={() => setTab('reasoning')}>Reasoning</TabButton>
+            </>
+          )}
+          <button
+            onClick={() => { if (window.confirm('Clear inference results?')) onClear(); }}
+            style={{
+              padding: '2px 8px',
+              fontSize: '11px',
+              background: 'transparent',
+              color: '#565f89',
+              border: '1px solid #2a2b3d',
+              borderRadius: '3px',
+              cursor: 'pointer',
+              marginLeft: '4px',
+            }}
+            title="Clear inference results"
+          >
+            Clear
+          </button>
+        </div>
       </div>
       <div style={{ flex: 1, overflow: 'auto' }}>
         {tab === 'summary' ? (
