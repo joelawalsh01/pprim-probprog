@@ -69,12 +69,16 @@ def run_simulation(
 
     trajectory = []
     step = 0
+    impulse_applied = False
 
     while data.time < config.duration:
-        # Apply upward force after trigger time
-        if data.time >= config.force_start_time and model.nu > 0:
-            data.ctrl[0] = config.force_magnitude
-        elif model.nu > 0:
+        # Apply impulse once at force_start_time (instantaneous velocity change)
+        if data.time >= config.force_start_time and not impulse_applied:
+            data.qvel[2] += config.force_magnitude  # Add upward velocity
+            impulse_applied = True
+
+        # Keep actuator off (impulse is applied directly to velocity)
+        if model.nu > 0:
             data.ctrl[0] = 0.0
 
         mujoco.mj_step(model, data)
@@ -129,12 +133,23 @@ def run_simulation_batch(
     return results
 
 
-def generate_alternative_trajectory(config: SimConfig) -> list[dict]:
+def generate_alternative_trajectory(
+    config: SimConfig,
+    initial_pos: tuple[float, float, float] | None = None,
+) -> list[dict]:
     """Generate the alternative trajectory analytically.
 
     In the alternative model, the ball moves horizontally until the force is applied,
     then moves straight up (force "replaces" velocity).
+
+    Args:
+        config: Simulation configuration.
+        initial_pos: (x, y, z) starting position of the ball from the MuJoCo model.
+                     If None, defaults to (0, 0, 0.5).
     """
+    x0 = initial_pos[0] if initial_pos else 0.0
+    z0 = initial_pos[2] if initial_pos else 0.5
+
     dt = config.duration / 200  # 200 points
     trajectory = []
     t = 0.0
@@ -143,19 +158,19 @@ def generate_alternative_trajectory(config: SimConfig) -> list[dict]:
     while t < config.duration:
         if t < config.force_start_time:
             # Moving horizontally
-            x = config.initial_vx * t
-            z = 0.5  # Starting height
+            x = x0 + config.initial_vx * t
+            z = z0
             vx = config.initial_vx
             vz = 0.0
         else:
-            # Force replaces velocity: ball goes straight up from where it was
-            x_at_force = config.initial_vx * config.force_start_time
+            # Force replaces velocity: ball goes straight up at constant velocity
+            x_at_force = x0 + config.initial_vx * config.force_start_time
             dt_after = t - config.force_start_time
             x = x_at_force  # Horizontal motion stops
-            accel = config.force_magnitude / mass
-            z = 0.5 + 0.5 * accel * dt_after**2
+            vz_impulse = config.force_magnitude
+            z = z0 + vz_impulse * dt_after
             vx = 0.0
-            vz = accel * dt_after
+            vz = vz_impulse
 
         trajectory.append({
             "t": round(t, 6),
