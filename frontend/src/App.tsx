@@ -1,15 +1,100 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Dashboard from './components/Dashboard';
-import type { SimulationResult, InferenceResult, Project, PPrimConfig } from './types';
+import type { SimulationResult, InferenceResult, Project, PPrimConfig, SimParams } from './types';
 import { getExample, getModels, simulate, runInference } from './api';
-import { DEFAULT_DISESSA_PPRIM_CONFIG } from './defaults/pprimConfigs';
+import {
+  DEFAULT_DISESSA_PPRIM_CONFIG,
+  DEFAULT_SPIRAL_TUBE_PPRIM_CONFIG,
+  DEFAULT_FRICTIONLESS_PUSH_PPRIM_CONFIG,
+  DEFAULT_GALILEO_DROP_PPRIM_CONFIG,
+} from './defaults/pprimConfigs';
+import {
+  SPIRAL_TUBE_PYRO_MODEL,
+  FRICTIONLESS_PUSH_PYRO_MODEL,
+  GALILEO_DROP_PYRO_MODEL,
+} from './defaults/pyroModels';
+import {
+  SPIRAL_TUBE_MJCF,
+  FRICTIONLESS_PUSH_MJCF,
+  GALILEO_DROP_MJCF,
+} from './defaults/mjcfExamples';
 
 const DEFAULT_EXAMPLE = 'disessa_ball';
 const STORAGE_KEY = 'disessa-balls-projects';
 const ACTIVE_KEY = 'disessa-balls-active-project';
 
+/** Registry mapping scenario IDs to their display name, MJCF example name, Pyro model code, PPrim config, and simulation parameters. */
+const SCENARIO_REGISTRY: Record<string, {
+  name: string;
+  exampleFile: string;
+  fallbackMjcf: string;
+  pyroCode: string;
+  pprimConfig: PPrimConfig;
+  simParams?: SimParams;
+}> = {
+  disessa_ball: {
+    name: 'DiSessa Ball',
+    exampleFile: 'disessa_ball',
+    fallbackMjcf: '', // uses FALLBACK_MJCF below
+    pyroCode: '', // filled at runtime from API/fallback
+    pprimConfig: DEFAULT_DISESSA_PPRIM_CONFIG,
+    // Uses defaults: initial_vx=3.0, force_magnitude=10.0, force_start_time=0.5
+  },
+  spiral_tube: {
+    name: 'Spiral Tube Exit',
+    exampleFile: 'spiral_tube',
+    fallbackMjcf: SPIRAL_TUBE_MJCF,
+    pyroCode: SPIRAL_TUBE_PYRO_MODEL,
+    pprimConfig: DEFAULT_SPIRAL_TUBE_PPRIM_CONFIG,
+    simParams: {
+      initial_vx: 2.0,       // Ball exits tube moving right
+      force_magnitude: 0,     // No impulse — scripted trajectory handles motion
+      force_start_time: 999,  // No force event
+      include_naive: true,    // Show alternative: ball continues curving
+      duration: 3.0,
+    },
+  },
+  frictionless_push: {
+    name: 'Frictionless Push',
+    exampleFile: 'frictionless_push',
+    fallbackMjcf: FRICTIONLESS_PUSH_MJCF,
+    pyroCode: FRICTIONLESS_PUSH_PYRO_MODEL,
+    pprimConfig: DEFAULT_FRICTIONLESS_PUSH_PPRIM_CONFIG,
+    simParams: {
+      initial_vx: 5.0,       // Ball already moving (post-push)
+      force_magnitude: 0,     // No additional force
+      force_start_time: 999,
+      include_naive: true,    // Show alternative: ball slows and stops
+      duration: 3.0,
+    },
+  },
+  galileo_drop: {
+    name: "Galileo's Drop",
+    exampleFile: 'galileo_drop',
+    fallbackMjcf: GALILEO_DROP_MJCF,
+    pyroCode: GALILEO_DROP_PYRO_MODEL,
+    pprimConfig: DEFAULT_GALILEO_DROP_PPRIM_CONFIG,
+    simParams: {
+      initial_vx: 0,          // Both balls start at rest
+      force_magnitude: 0,     // Gravity does the work (set in MJCF)
+      force_start_time: 999,
+      include_naive: true,    // Show alternative: heavy ball falls faster
+      duration: 1.5,          // Shorter — balls fall quickly
+      camera_name: 'side',
+    },
+  },
+};
+
 function generateId() {
   return Math.random().toString(36).slice(2, 10);
+}
+
+/** Look up scenario simParams by project name. */
+function findSimParamsForProject(name: string): SimParams | undefined {
+  for (const scenario of Object.values(SCENARIO_REGISTRY)) {
+    if (scenario.name === name) return scenario.simParams;
+  }
+  return undefined;
 }
 
 function loadProjects(): Project[] | null {
@@ -17,10 +102,11 @@ function loadProjects(): Project[] | null {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Project[];
-    // Migration: add pprimConfig if missing on existing saved projects
+    // Migration: add pprimConfig and simParams if missing on existing saved projects
     return parsed.map(p => ({
       ...p,
       pprimConfig: p.pprimConfig !== undefined ? p.pprimConfig : null,
+      simParams: p.simParams !== undefined ? p.simParams : findSimParamsForProject(p.name),
     }));
   } catch {
     return null;
@@ -188,6 +274,7 @@ export default function App() {
         render_frames: true,
         include_naive: true,
         max_frames: 60,
+        ...activeProject.simParams, // Scenario-specific overrides
       });
       updateActiveProject({ simResult: result });
     } catch (e: any) {
@@ -254,6 +341,37 @@ export default function App() {
     ));
   }, []);
 
+  const handleLoadScenario = useCallback(async (scenarioId: string) => {
+    const scenario = SCENARIO_REGISTRY[scenarioId];
+    if (!scenario) return;
+
+    // Fetch MJCF from the simulator API, fall back to bundled MJCF
+    const fallback = scenario.fallbackMjcf || FALLBACK_MJCF;
+    let mjcf = fallback;
+    try {
+      const res = await getExample(scenario.exampleFile);
+      mjcf = res.mjcf_xml;
+    } catch {
+      // Service might not be up — use bundled fallback
+    }
+
+    // For DiSessa Ball, use the API-fetched Pyro code; for others, use the bundled default
+    const pyro = scenarioId === 'disessa_ball' ? defaultPyroCode : scenario.pyroCode;
+
+    const newProject: Project = {
+      id: generateId(),
+      name: scenario.name,
+      mjcfXml: mjcf,
+      pyroCode: pyro,
+      pprimConfig: scenario.pprimConfig,
+      simParams: scenario.simParams,
+      simResult: null,
+      inferResult: null,
+    };
+    setProjects(prev => [...prev, newProject]);
+    setActiveProjectId(newProject.id);
+  }, [defaultPyroCode]);
+
   if (!initialized || !activeProject) {
     return (
       <div style={{ background: '#1a1b26', height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -288,6 +406,8 @@ export default function App() {
       onClearAllResults={handleClearAllResults}
       onClearMjcf={handleClearMjcf}
       onClearPyroCode={handleClearPyroCode}
+      scenarios={Object.entries(SCENARIO_REGISTRY).map(([id, s]) => ({ id, name: s.name }))}
+      onLoadScenario={handleLoadScenario}
     />
   );
 }

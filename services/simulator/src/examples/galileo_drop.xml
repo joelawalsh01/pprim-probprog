@@ -1,0 +1,43 @@
+<mujoco model="galileo_drop">
+  <option timestep="0.002" gravity="0 0 -9.81" integrator="RK4"/>
+  <!-- Gravity ON: this scenario is about whether mass affects fall rate -->
+
+  <asset>
+    <material name="ground" rgba="0.12 0.12 0.18 1" specular="0" shininess="0"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 8" dir="0 0 -1" diffuse="0.8 0.8 0.8" castshadow="false"/>
+    <light pos="0 -3 5" dir="0 0.5 -0.5" diffuse="0.4 0.4 0.5"/>
+
+    <!-- Ground plane (visual only) -->
+    <geom type="plane" size="5 5 0.01" material="ground" contype="0" conaffinity="0"/>
+
+    <!-- Heavy ball (5 kg) — dropped from left side -->
+    <body name="heavy_ball" pos="-0.5 0 5">
+      <joint type="free" damping="0"/>
+      <geom type="sphere" size="0.15" mass="5.0" rgba="0.8 0.2 0.2 1"
+            contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- Light ball (0.5 kg) — dropped from right side -->
+    <body name="light_ball" pos="0.5 0 5">
+      <joint type="free" damping="0"/>
+      <geom type="sphere" size="0.08" mass="0.5" rgba="0.2 0.6 1.0 1"
+            contype="0" conaffinity="0"/>
+    </body>
+
+    <!-- Cameras -->
+    <camera name="side" pos="0 -6 3" xyaxes="1 0 0 0 0.3 1"/>
+    <camera name="front" pos="0 -4 3" xyaxes="1 0 0 0 0.3 1"/>
+  </worldbody>
+
+  <!-- No actuators needed — both balls fall under gravity only -->
+
+  <sensor>
+    <framepos name="heavy_ball_pos" objtype="body" objname="heavy_ball"/>
+    <framepos name="light_ball_pos" objtype="body" objname="light_ball"/>
+    <framelinvel name="heavy_ball_vel" objtype="body" objname="heavy_ball"/>
+    <framelinvel name="light_ball_vel" objtype="body" objname="light_ball"/>
+  </sensor>
+</mujoco>

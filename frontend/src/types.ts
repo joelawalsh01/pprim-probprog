@@ -91,12 +91,25 @@ export interface PPrimConfig {
   mappings: PPrimMapping[];
 }
 
+export interface SimParams {
+  duration?: number;
+  initial_vx?: number;
+  initial_vy?: number;
+  initial_vz?: number;
+  force_start_time?: number;
+  force_magnitude?: number;
+  damping?: number;
+  include_naive?: boolean;
+  camera_name?: string;
+}
+
 export interface Project {
   id: string;
   name: string;
   mjcfXml: string;
   pyroCode: string;
   pprimConfig: PPrimConfig | null;
+  simParams?: SimParams;
   simResult: SimulationResult | null;
   inferResult: InferenceResult | null;
 }

@@ -1,0 +1,39 @@
+<mujoco model="frictionless_push">
+  <option timestep="0.002" gravity="0 0 0" integrator="RK4"/>
+  <!-- No gravity: top-down view of frictionless surface -->
+
+  <asset>
+    <material name="ground" rgba="0.12 0.12 0.18 1" specular="0" shininess="0"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 5" dir="0 0 -1" diffuse="0.8 0.8 0.8" castshadow="false"/>
+    <light pos="0 -3 3" dir="0 0.5 -0.5" diffuse="0.4 0.4 0.5"/>
+
+    <!-- Ground reference plane (visual only, represents frictionless surface from above) -->
+    <geom type="plane" size="5 5 0.01" material="ground" contype="0" conaffinity="0"/>
+
+    <!-- The puck/ball on frictionless surface -->
+    <body name="ball" pos="-3 0 0.5">
+      <joint type="free" damping="0"/>
+      <geom type="sphere" size="0.1" mass="1.0" rgba="0.2 0.8 0.4 1"
+            contype="0" conaffinity="0"/>
+      <site name="force_point" pos="0 0 0" size="0.01"/>
+    </body>
+
+    <!-- Cameras -->
+    <camera name="side" pos="0 -4 1.0" xyaxes="1 0 0 0 0.3 1"/>
+    <camera name="top" pos="0 0 5" xyaxes="1 0 0 0 1 0"/>
+  </worldbody>
+
+  <actuator>
+    <!-- Horizontal push force (brief impulse, then released) -->
+    <motor name="push_force" site="force_point" gear="1 0 0 0 0 0"
+           ctrllimited="true" ctrlrange="0 50"/>
+  </actuator>
+
+  <sensor>
+    <framepos name="ball_pos" objtype="body" objname="ball"/>
+    <framelinvel name="ball_vel" objtype="body" objname="ball"/>
+  </sensor>
+</mujoco>

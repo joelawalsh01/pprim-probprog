@@ -53,8 +53,44 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
   const [exportProgress, setExportProgress] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const intervalRef = useRef<number | null>(null);
+  const frameImagesRef = useRef<HTMLImageElement[]>([]);
+  const [frameImagesLoaded, setFrameImagesLoaded] = useState(false);
 
-  // Draw current frame — always 2D canvas with both balls
+  // Pre-load frame images from base64 PNGs
+  useEffect(() => {
+    if (!frames || frames.length === 0) {
+      frameImagesRef.current = [];
+      setFrameImagesLoaded(false);
+      return;
+    }
+    let cancelled = false;
+    const images: HTMLImageElement[] = [];
+    let loaded = 0;
+    frames.forEach((b64, i) => {
+      const img = new Image();
+      img.onload = () => {
+        if (cancelled) return;
+        images[i] = img;
+        loaded++;
+        if (loaded === frames.length) {
+          frameImagesRef.current = images;
+          setFrameImagesLoaded(true);
+        }
+      };
+      img.onerror = () => {
+        if (cancelled) return;
+        loaded++;
+        if (loaded === frames.length) {
+          frameImagesRef.current = images;
+          setFrameImagesLoaded(true);
+        }
+      };
+      img.src = `data:image/png;base64,${b64}`;
+    });
+    return () => { cancelled = true; };
+  }, [frames]);
+
+  // Draw current frame — MuJoCo rendered frame as background + trajectory overlay
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -68,19 +104,30 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     ctx.fillRect(0, 0, w, h);
 
     if (frames && frames.length > 0) {
+      // Draw MuJoCo-rendered frame as background (shows scene geometry)
+      const frameImg = frameImagesRef.current[frameIdx];
+      if (frameImg) {
+        ctx.drawImage(frameImg, 0, 0, w, h);
+        // Semi-transparent overlay so trajectory balls are visible on top
+        ctx.fillStyle = 'rgba(26, 27, 38, 0.4)';
+        ctx.fillRect(0, 0, w, h);
+      }
       drawTrajectoryOverlay(ctx, w, h, frameIdx, frames.length, true);
+    } else if (trajectory && trajectory.length > 0) {
+      // No rendered frames but we have trajectory data — show final state
+      drawTrajectoryOverlay(ctx, w, h, trajectory.length - 1, trajectory.length, false);
     } else if (loading) {
       ctx.fillStyle = '#7aa2f7';
       ctx.font = '14px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Simulating...', w / 2, h / 2);
-    } else if (!trajectory) {
+    } else {
       ctx.fillStyle = '#565f89';
       ctx.font = '14px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('Click "Simulate" to run', w / 2, h / 2);
     }
-  }, [frames, frameIdx, trajectory, naiveTrajectory, showNaive, loading]);
+  }, [frames, frameIdx, frameImagesLoaded, trajectory, naiveTrajectory, showNaive, loading]);
 
   // Report animation progress to parent
   useEffect(() => {
@@ -247,18 +294,28 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     }
 
     // "Shove" ball — approaches from below and hits at the divergence point.
-    // Like the diSessa diagram: a second ball causes the upward force.
+    // Only shown for DiSessa-style scenarios where there's a flat horizontal
+    // phase followed by an upward impulse. Skip for scenarios where z changes
+    // from the start (spiral tube, galileo drop, etc.).
     if (naiveTrajectory && naiveTrajectory.length > 1 && trajectory.length > 1) {
       // Find force time: the moment the alternative trajectory's z starts changing
       // (before force, z is constant; after force, z increases)
       const baseZ = naiveTrajectory[0].z;
       let forceTime = naiveTrajectory[naiveTrajectory.length - 1].t;
+      let hasHorizontalPhase = false;
       for (let i = 1; i < naiveTrajectory.length; i++) {
         if (Math.abs(naiveTrajectory[i].z - baseZ) > 0.01) {
           forceTime = naiveTrajectory[Math.max(0, i - 1)].t;
+          // Only count as having a horizontal phase if z was flat for a meaningful period
+          hasHorizontalPhase = i > naiveTrajectory.length * 0.1;
           break;
         }
       }
+
+      // Skip shove ball for scenarios without a clear horizontal→force transition
+      if (!hasHorizontalPhase) {
+        // Still draw the legend — skip the shove ball
+      } else {
 
       // Find the corresponding index in the Newtonian trajectory
       let forceIdx = 0;
@@ -305,6 +362,7 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
         ctx.textAlign = 'center';
         ctx.fillText('F', hitX, hitZ + ballRadius * 2 + 8);
       }
+      } // end hasHorizontalPhase else
     }
 
     // Legend
@@ -372,9 +430,15 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     const h = canvas.height;
 
     for (let i = 0; i < frames.length; i++) {
-      // Clean dark background — no MuJoCo frames, just the balls + trails
       ctx.fillStyle = '#1a1b26';
       ctx.fillRect(0, 0, w, h);
+      // Draw MuJoCo frame as background if available
+      const frameImg = frameImagesRef.current[i];
+      if (frameImg) {
+        ctx.drawImage(frameImg, 0, 0, w, h);
+        ctx.fillStyle = 'rgba(26, 27, 38, 0.4)';
+        ctx.fillRect(0, 0, w, h);
+      }
       drawTrajectoryOverlay(ctx, w, h, i, frames.length, true);
 
       const track = stream.getVideoTracks()[0];

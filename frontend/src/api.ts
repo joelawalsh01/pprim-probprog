@@ -29,12 +29,15 @@ export async function simulate(params: {
   mjcf_xml: string;
   duration?: number;
   initial_vx?: number;
+  initial_vy?: number;
+  initial_vz?: number;
   force_start_time?: number;
   force_magnitude?: number;
   damping?: number;
   render_frames?: boolean;
   max_frames?: number;
   include_naive?: boolean;
+  camera_name?: string;
 }): Promise<SimulationResult> {
   return fetchJSON(`${SIM_BASE}/simulate`, {
     method: 'POST',

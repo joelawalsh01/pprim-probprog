@@ -32,6 +32,8 @@ interface Props {
   onClearAllResults: () => void;
   onClearMjcf: () => void;
   onClearPyroCode: () => void;
+  scenarios?: { id: string; name: string }[];
+  onLoadScenario?: (scenarioId: string) => void;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -206,9 +208,36 @@ export default function Dashboard(props: Props) {
     <div style={styles.container}>
       <div style={styles.header}>
         <div>
-          <h1 style={styles.title}>DiSessa Balls</h1>
+          <h1 style={styles.title}>P-Prims Explorer</h1>
           <p style={styles.subtitle}>Analysis-by-Synthesis Physics Prior Extraction</p>
         </div>
+        {props.scenarios && props.onLoadScenario && (
+          <select
+            value=""
+            onChange={e => {
+              if (e.target.value) {
+                props.onLoadScenario!(e.target.value);
+                e.target.value = '';
+              }
+            }}
+            style={{
+              marginLeft: 'auto',
+              padding: '6px 10px',
+              fontSize: '12px',
+              background: '#24283b',
+              color: '#c0caf5',
+              border: '1px solid #3b3d57',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              outline: 'none',
+            }}
+          >
+            <option value="" disabled>Load scenario...</option>
+            {props.scenarios.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       <div style={styles.tabBar}>

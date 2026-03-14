@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from .simulation import SimConfig, run_simulation, run_simulation_batch, generate_alternative_trajectory
+from .simulation import SimConfig, run_simulation, run_simulation_batch, generate_alternative_trajectory, _get_model_name
 from .renderer import render_frames
 
 app = FastAPI(title="DiSessa Simulator", version="0.1.0")
@@ -115,9 +115,9 @@ def simulate(req: SimulateRequest):
             result["render_error"] = str(e)
 
     if req.include_naive:
-        # Extract ball's initial position from MJCF so alternative trajectory
-        # starts at the same point as the Newtonian simulation
+        # Extract ball's initial position and model name from MJCF
         initial_pos = None
+        model_name = _get_model_name(req.mjcf_xml)
         try:
             import mujoco
             model = mujoco.MjModel.from_xml_string(req.mjcf_xml)
@@ -125,7 +125,9 @@ def simulate(req: SimulateRequest):
             initial_pos = (float(data.qpos[0]), float(data.qpos[1]), float(data.qpos[2]))
         except Exception:
             pass
-        result["naive_trajectory"] = generate_alternative_trajectory(config, initial_pos)
+        result["naive_trajectory"] = generate_alternative_trajectory(
+            config, initial_pos, model_name=model_name
+        )
 
     return result
 
