@@ -553,6 +553,102 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     setExporting(false);
   }, [frames, frameIdx, trajectory, naiveTrajectory, showNaive]);
 
+  // Export a PNG filmstrip (contact sheet) of key frames — readable by Claude for troubleshooting
+  const exportFilmstrip = useCallback(() => {
+    if (!trajectory || trajectory.length === 0) return;
+
+    const numKeyFrames = 6;
+    const frameW = 600;
+    const frameH = 400;
+    const cols = 3;
+    const rows = 2;
+    const labelH = 20;
+    const totalW = frameW * cols;
+    const totalH = (frameH + labelH) * rows;
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width = totalW;
+    offscreen.height = totalH;
+    const ctx = offscreen.getContext('2d');
+    if (!ctx) return;
+
+    ctx.fillStyle = '#1a1b26';
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    const totalFrameCount = frames?.length || trajectory.length;
+
+    for (let f = 0; f < numKeyFrames; f++) {
+      const col = f % cols;
+      const row = Math.floor(f / cols);
+      const ox = col * frameW;
+      const oy = row * (frameH + labelH);
+
+      // Frame index: evenly spaced across the animation
+      const frameIndex = Math.floor((f / (numKeyFrames - 1)) * (totalFrameCount - 1));
+
+      // Draw into a sub-region
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(ox, oy + labelH, frameW, frameH);
+      ctx.clip();
+      ctx.translate(ox, oy + labelH);
+
+      // Background
+      ctx.fillStyle = '#1a1b26';
+      ctx.fillRect(0, 0, frameW, frameH);
+
+      // MuJoCo frame if available
+      if (frames && frameImagesRef.current[frameIndex]) {
+        ctx.drawImage(frameImagesRef.current[frameIndex], 0, 0, frameW, frameH);
+        ctx.fillStyle = 'rgba(26, 27, 38, 0.2)';
+        ctx.fillRect(0, 0, frameW, frameH);
+      }
+
+      // Trajectory overlay at this point in time
+      drawTrajectoryOverlay(ctx, frameW, frameH, frameIndex, totalFrameCount, true);
+
+      ctx.restore();
+
+      // Frame label
+      ctx.fillStyle = '#565f89';
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'left';
+      const progress = Math.round((frameIndex / (totalFrameCount - 1)) * 100);
+      ctx.fillText(`Frame ${frameIndex}/${totalFrameCount - 1} (${progress}%)`, ox + 8, oy + 14);
+
+      // Border
+      ctx.strokeStyle = '#2a2b3d';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ox, oy, frameW, frameH + labelH);
+    }
+
+    // Save as PNG to Downloads
+    offscreen.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'simulation-filmstrip.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }, [frames, trajectory, naiveTrajectory, showNaive]);
+
+  // Snapshot: export current canvas state as PNG
+  const exportSnapshot = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'simulation-snapshot.png';
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }, []);
+
   const canExport = typeof MediaRecorder !== 'undefined' && getVideoMimeType() !== null;
 
   return (
@@ -586,6 +682,42 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
               {playing ? 'Playing...' : 'Play'}
             </button>
           )}
+          {(frames || trajectory) && (
+            <button
+              onClick={exportFilmstrip}
+              disabled={playing || exporting}
+              style={{
+                padding: '2px 10px',
+                fontSize: '11px',
+                background: '#364a82',
+                color: '#c0caf5',
+                border: 'none',
+                borderRadius: '3px',
+                cursor: playing || exporting ? 'default' : 'pointer',
+              }}
+              title="Export 6-frame filmstrip as PNG (for troubleshooting)"
+            >
+              Filmstrip
+            </button>
+          )}
+          {(frames || trajectory) && (
+            <button
+              onClick={exportSnapshot}
+              disabled={playing || exporting}
+              style={{
+                padding: '2px 10px',
+                fontSize: '11px',
+                background: '#364a82',
+                color: '#c0caf5',
+                border: 'none',
+                borderRadius: '3px',
+                cursor: playing || exporting ? 'default' : 'pointer',
+              }}
+              title="Export current frame as PNG"
+            >
+              Snapshot
+            </button>
+          )}
           {frames && frames.length > 0 && canExport && (
             <button
               onClick={exportVideo}
@@ -599,8 +731,9 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
                 borderRadius: '3px',
                 cursor: playing || exporting ? 'default' : 'pointer',
               }}
+              title="Export animation as video"
             >
-              {exporting ? `Exporting ${Math.round(exportProgress * 100)}%...` : 'Download'}
+              {exporting ? `${Math.round(exportProgress * 100)}%...` : 'Video'}
             </button>
           )}
           {(frames || trajectory) && (
