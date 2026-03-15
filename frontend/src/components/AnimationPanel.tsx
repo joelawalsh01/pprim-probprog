@@ -109,7 +109,7 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
       if (frameImg) {
         ctx.drawImage(frameImg, 0, 0, w, h);
         // Semi-transparent overlay so trajectory balls are visible on top
-        ctx.fillStyle = 'rgba(26, 27, 38, 0.4)';
+        ctx.fillStyle = 'rgba(26, 27, 38, 0.2)';
         ctx.fillRect(0, 0, w, h);
       }
       drawTrajectoryOverlay(ctx, w, h, frameIdx, frames.length, true);
@@ -182,6 +182,95 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     const ballRadius = 12;
     const ghostRadius = 8;
     const ghostCount = 8;
+
+    // Draw tube/channel if the trajectory starts with a curved arc phase.
+    // Detect by checking if the first 40% has significant z-change AND x-change (arc shape).
+    const arcEnd = Math.floor(trajectory.length * 0.4);
+    if (arcEnd > 5) {
+      const startPt = trajectory[0];
+      const midPt = trajectory[arcEnd];
+      const xTravel = Math.abs(midPt.x - startPt.x);
+      const zTravel = Math.abs(midPt.z - startPt.z);
+      // Arc detection: both x and z change significantly (not just straight horizontal/vertical)
+      const isArc = xTravel > 0.3 && zTravel > 0.3;
+      if (isArc) {
+        // Draw the tube as two parallel paths offset from the trajectory
+        const tubeWidth = 14; // pixels, half-width of the tube
+        ctx.save();
+
+        // Compute normals at each point and draw inner/outer walls
+        const arcPoints = trajectory.slice(0, arcEnd + 1);
+        const outerPath: [number, number][] = [];
+        const innerPath: [number, number][] = [];
+
+        for (let i = 0; i < arcPoints.length; i++) {
+          const cx = toCanvasX(arcPoints[i].x);
+          const cz = toCanvasZ(arcPoints[i].z);
+
+          // Compute normal direction from adjacent points
+          let dx: number, dz: number;
+          if (i === 0) {
+            dx = toCanvasX(arcPoints[1].x) - cx;
+            dz = toCanvasZ(arcPoints[1].z) - cz;
+          } else if (i === arcPoints.length - 1) {
+            dx = cx - toCanvasX(arcPoints[i - 1].x);
+            dz = cz - toCanvasZ(arcPoints[i - 1].z);
+          } else {
+            dx = toCanvasX(arcPoints[i + 1].x) - toCanvasX(arcPoints[i - 1].x);
+            dz = toCanvasZ(arcPoints[i + 1].z) - toCanvasZ(arcPoints[i - 1].z);
+          }
+          const len = Math.sqrt(dx * dx + dz * dz) || 1;
+          const nx = -dz / len; // normal perpendicular to path
+          const nz = dx / len;
+
+          outerPath.push([cx + nx * tubeWidth, cz + nz * tubeWidth]);
+          innerPath.push([cx - nx * tubeWidth, cz - nz * tubeWidth]);
+        }
+
+        // Draw filled tube channel
+        ctx.beginPath();
+        ctx.moveTo(outerPath[0][0], outerPath[0][1]);
+        for (const [x, z] of outerPath) ctx.lineTo(x, z);
+        // Connect to inner path in reverse
+        for (let i = innerPath.length - 1; i >= 0; i--) {
+          ctx.lineTo(innerPath[i][0], innerPath[i][1]);
+        }
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(60, 70, 90, 0.4)';
+        ctx.fill();
+
+        // Draw tube walls
+        ctx.beginPath();
+        ctx.moveTo(outerPath[0][0], outerPath[0][1]);
+        for (const [x, z] of outerPath) ctx.lineTo(x, z);
+        ctx.strokeStyle = 'rgba(120, 140, 180, 0.6)';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(innerPath[0][0], innerPath[0][1]);
+        for (const [x, z] of innerPath) ctx.lineTo(x, z);
+        ctx.strokeStyle = 'rgba(120, 140, 180, 0.6)';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // Draw exit opening marker
+        const exitOuter = outerPath[outerPath.length - 1];
+        const exitInner = innerPath[innerPath.length - 1];
+        ctx.beginPath();
+        ctx.moveTo(exitOuter[0], exitOuter[1]);
+        ctx.lineTo(exitOuter[0] + 15, exitOuter[1]);
+        ctx.strokeStyle = 'rgba(140, 200, 140, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(exitInner[0], exitInner[1]);
+        ctx.lineTo(exitInner[0] + 15, exitInner[1]);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+    }
 
     // Draw a 3D-looking sphere with radial gradient, highlight, and shadow
     function drawSphere(
