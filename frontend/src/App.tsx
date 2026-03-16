@@ -272,9 +272,9 @@ export default function App() {
       const result = await simulate({
         mjcf_xml: activeProject.mjcfXml,
         render_frames: true,
-        include_naive: true,
         max_frames: 60,
         ...activeProject.simParams, // Scenario-specific overrides
+        include_naive: true,         // Always include — must come after spread
       });
       updateActiveProject({ simResult: result });
     } catch (e: any) {

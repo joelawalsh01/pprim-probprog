@@ -130,17 +130,15 @@ export default function TrajectoryPanel({ simTrajectory, naiveTrajectory, newton
       ctx!.fill();
     }
 
-    // Draw in order: sim, newtonian, naive
+    // Draw in order: sim (Newtonian), naive (Alternative)
     if (simTrajectory) drawTraj(simTrajectory, '#7aa2f7', 2.5);
-    if (newtonianTrajectory) drawTraj(newtonianTrajectory, '#9ece6a', 2, [4, 2]);
     if (naiveTrajectory) drawTraj(naiveTrajectory, '#f7768e', 2, [6, 4]);
 
     // Legend
     const legendY = 16;
     let legendX = margin;
     const items = [
-      { label: 'MuJoCo sim', color: '#7aa2f7', has: !!simTrajectory },
-      { label: 'Newtonian', color: '#9ece6a', has: !!newtonianTrajectory },
+      { label: 'Newtonian', color: '#7aa2f7', has: !!simTrajectory },
       { label: 'Alternative', color: '#f7768e', has: !!naiveTrajectory },
     ];
     ctx.font = '11px sans-serif';

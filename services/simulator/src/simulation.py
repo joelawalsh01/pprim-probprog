@@ -246,40 +246,60 @@ def _generate_disessa_alternative(
 def _generate_spiral_tube_alternative(config: SimConfig) -> list[dict]:
     """Spiral Tube: ball continues curving after exit (curvilinear impetus).
 
-    Same arc phase as Newtonian, but after exit the ball keeps following
-    the circular arc instead of going straight.
+    Arc phase: identical to Newtonian (ball is constrained inside tube).
+    Exit phase: ball travels at constant speed but its heading (velocity
+    direction) keeps rotating clockwise with exponentially decaying turn
+    rate — the "dying away" of curvilinear impetus. This traces a spiral
+    that gradually straightens into a line.
+    Per McCloskey et al. (1980, 1983) and Freyd & Jones (1994).
     """
     duration = config.duration
     speed = config.initial_vx or 2.0
     arc_time = duration * 0.4
-    arc_center_x = 0.0
-    arc_center_z = 0.05
-    arc_radius = 1.0
+    turn_rate_0 = (math.pi / 2.0) / arc_time  # turning rate at exit (rad/s)
+    decay_rate = 3.0  # controls how fast the curve straightens
+
+    # Exit point (from _spiral_tube_position at t=arc_time)
+    exit_x, _, exit_z, exit_vx, _, exit_vz = _spiral_tube_position(
+        arc_time - 1e-9, duration, speed
+    )
+    # Exit velocity direction: heading angle measured from +x axis
+    # At exit (top of arc), velocity is (+, 0) i.e. heading = 0
+    exit_heading = math.atan2(exit_vz, exit_vx)
+    exit_speed = math.sqrt(exit_vx**2 + exit_vz**2)
 
     dt = duration / 200
     trajectory = []
     t = 0.0
 
+    # For exit phase: numerically integrate position from velocity
+    alt_x = exit_x
+    alt_z = exit_z
+    prev_t = arc_time
+
     while t < duration:
         if t < arc_time:
-            # Arc phase (same as Newtonian — ball is inside tube)
-            frac = t / arc_time
-            angle = math.pi * (1.0 - 0.5 * frac)  # pi → pi/2
+            # Arc phase: identical to Newtonian (ball is inside tube)
+            x, _, z, vx, _, vz = _spiral_tube_position(t, duration, speed)
         else:
-            # Alternative: ball continues curving past the exit point
-            # The arc continues beyond pi/2 (exit) toward 0 and beyond
-            frac_in_tube = 1.0  # tube phase complete
+            # After exit: constant speed, decaying turn rate
             dt_after = t - arc_time
-            # Angular velocity = (pi/2) / arc_time radians per second
-            angular_vel = (math.pi / 2.0) / arc_time
-            angle = math.pi / 2.0 - angular_vel * dt_after
+            # Heading angle: integrate decaying turn rate
+            # heading(t) = exit_heading - (turn_rate_0/decay_rate)*(1 - exp(-decay_rate*dt_after))
+            heading = exit_heading - (turn_rate_0 / decay_rate) * (
+                1 - math.exp(-decay_rate * dt_after)
+            )
+            vx = exit_speed * math.cos(heading)
+            vz = exit_speed * math.sin(heading)
 
-        x = arc_center_x + arc_radius * math.cos(angle)
-        z = arc_center_z + arc_radius * math.sin(angle)
-        # Tangential velocity
-        angular_vel = (math.pi / 2.0) / arc_time
-        vx = arc_radius * angular_vel * math.sin(angle)
-        vz = -arc_radius * angular_vel * math.cos(angle)
+            # Integrate position (Euler step from previous point)
+            step_dt = t - prev_t
+            alt_x += vx * step_dt
+            alt_z += vz * step_dt
+            prev_t = t
+
+            x = alt_x
+            z = alt_z
 
         trajectory.append({
             "t": round(t, 6),

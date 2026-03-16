@@ -104,14 +104,8 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     ctx.fillRect(0, 0, w, h);
 
     if (frames && frames.length > 0) {
-      // Draw MuJoCo-rendered frame as background (shows scene geometry)
-      const frameImg = frameImagesRef.current[frameIdx];
-      if (frameImg) {
-        ctx.drawImage(frameImg, 0, 0, w, h);
-        // Semi-transparent overlay so trajectory balls are visible on top
-        ctx.fillStyle = 'rgba(26, 27, 38, 0.2)';
-        ctx.fillRect(0, 0, w, h);
-      }
+      // Canvas draws all trajectory visualization — skip MuJoCo frame backgrounds
+      // to avoid a duplicate rendered ball appearing alongside the canvas balls.
       drawTrajectoryOverlay(ctx, w, h, frameIdx, frames.length, true);
     } else if (trajectory && trajectory.length > 0) {
       // No rendered frames but we have trajectory data — show final state
@@ -184,15 +178,16 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     const ghostCount = 8;
 
     // Draw tube/channel if the trajectory starts with a curved arc phase.
-    // Detect by checking if the first 40% has significant z-change AND x-change (arc shape).
+    // Must curve from the very start (z changes in first 10%), not just straight-then-diagonal.
+    const earlyEnd = Math.floor(trajectory.length * 0.1);
     const arcEnd = Math.floor(trajectory.length * 0.4);
-    if (arcEnd > 5) {
+    if (arcEnd > 5 && earlyEnd >= 3) {
       const startPt = trajectory[0];
+      const earlyZ = Math.abs(trajectory[earlyEnd].z - startPt.z);
       const midPt = trajectory[arcEnd];
       const xTravel = Math.abs(midPt.x - startPt.x);
       const zTravel = Math.abs(midPt.z - startPt.z);
-      // Arc detection: both x and z change significantly (not just straight horizontal/vertical)
-      const isArc = xTravel > 0.3 && zTravel > 0.3;
+      const isArc = earlyZ > 0.1 && xTravel > 0.3 && zTravel > 0.3;
       if (isArc) {
         // Draw the tube as two parallel paths offset from the trajectory
         const tubeWidth = 14; // pixels, half-width of the tube
@@ -459,7 +454,7 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     ctx.textAlign = 'left';
     ctx.fillStyle = '#7aa2f7';
     ctx.fillText('Newtonian', margin, 20);
-    if (showNaive) {
+    if (showNaive && naiveTrajectory && naiveTrajectory.length > 0) {
       ctx.fillStyle = '#f7768e';
       ctx.fillText('Alternative', margin + 80, 20);
     }
@@ -521,13 +516,6 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
     for (let i = 0; i < frames.length; i++) {
       ctx.fillStyle = '#1a1b26';
       ctx.fillRect(0, 0, w, h);
-      // Draw MuJoCo frame as background if available
-      const frameImg = frameImagesRef.current[i];
-      if (frameImg) {
-        ctx.drawImage(frameImg, 0, 0, w, h);
-        ctx.fillStyle = 'rgba(26, 27, 38, 0.4)';
-        ctx.fillRect(0, 0, w, h);
-      }
       drawTrajectoryOverlay(ctx, w, h, i, frames.length, true);
 
       const track = stream.getVideoTracks()[0];
@@ -596,13 +584,6 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
       // Background
       ctx.fillStyle = '#1a1b26';
       ctx.fillRect(0, 0, frameW, frameH);
-
-      // MuJoCo frame if available
-      if (frames && frameImagesRef.current[frameIndex]) {
-        ctx.drawImage(frameImagesRef.current[frameIndex], 0, 0, frameW, frameH);
-        ctx.fillStyle = 'rgba(26, 27, 38, 0.2)';
-        ctx.fillRect(0, 0, frameW, frameH);
-      }
 
       // Trajectory overlay at this point in time
       drawTrajectoryOverlay(ctx, frameW, frameH, frameIndex, totalFrameCount, true);
