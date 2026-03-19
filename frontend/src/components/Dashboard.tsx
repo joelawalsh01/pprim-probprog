@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { SimulationResult, InferenceResult, Project, PPrimConfig } from '../types';
+import type { SimulationResult, InferenceResult, Project, PPrimConfig, VisualizationHints } from '../types';
 import AnimationPanel from './AnimationPanel';
 import MujocoCodePanel from './MujocoCodePanel';
 import PyroCodePanel from './PyroCodePanel';
@@ -203,6 +203,7 @@ function ProjectTab({
 export default function Dashboard(props: Props) {
   const canClose = props.projects.length > 1;
   const [animationProgress, setAnimationProgress] = useState(-1);
+  const activeProject = props.projects.find(p => p.id === props.activeProjectId);
 
   return (
     <div style={styles.container}>
@@ -293,6 +294,7 @@ export default function Dashboard(props: Props) {
           loading={props.simLoading}
           onClear={props.onClearSimResult}
           onAnimationProgress={setAnimationProgress}
+          visualHints={activeProject?.visualHints}
         />
 
         <MujocoCodePanel

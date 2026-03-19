@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Dashboard from './components/Dashboard';
-import type { SimulationResult, InferenceResult, Project, PPrimConfig, SimParams } from './types';
+import type { SimulationResult, InferenceResult, Project, PPrimConfig, SimParams, VisualizationHints } from './types';
 import { getExample, getModels, simulate, runInference } from './api';
 import {
   DEFAULT_DISESSA_PPRIM_CONFIG,
@@ -31,6 +31,7 @@ const SCENARIO_REGISTRY: Record<string, {
   pyroCode: string;
   pprimConfig: PPrimConfig;
   simParams?: SimParams;
+  visualHints?: VisualizationHints;
 }> = {
   disessa_ball: {
     name: 'DiSessa Ball',
@@ -38,6 +39,7 @@ const SCENARIO_REGISTRY: Record<string, {
     fallbackMjcf: '', // uses FALLBACK_MJCF below
     pyroCode: '', // filled at runtime from API/fallback
     pprimConfig: DEFAULT_DISESSA_PPRIM_CONFIG,
+    visualHints: { showTube: false, showForceIndicator: true },
     // Uses defaults: initial_vx=3.0, force_magnitude=10.0, force_start_time=0.5
   },
   spiral_tube: {
@@ -46,6 +48,7 @@ const SCENARIO_REGISTRY: Record<string, {
     fallbackMjcf: SPIRAL_TUBE_MJCF,
     pyroCode: SPIRAL_TUBE_PYRO_MODEL,
     pprimConfig: DEFAULT_SPIRAL_TUBE_PPRIM_CONFIG,
+    visualHints: { showTube: true, showForceIndicator: false },
     simParams: {
       initial_vx: 2.0,       // Ball exits tube moving right
       force_magnitude: 0,     // No impulse — scripted trajectory handles motion
@@ -60,6 +63,7 @@ const SCENARIO_REGISTRY: Record<string, {
     fallbackMjcf: FRICTIONLESS_PUSH_MJCF,
     pyroCode: FRICTIONLESS_PUSH_PYRO_MODEL,
     pprimConfig: DEFAULT_FRICTIONLESS_PUSH_PPRIM_CONFIG,
+    visualHints: { showTube: false, showForceIndicator: false },
     simParams: {
       initial_vx: 5.0,       // Ball already moving (post-push)
       force_magnitude: 0,     // No additional force
@@ -74,6 +78,7 @@ const SCENARIO_REGISTRY: Record<string, {
     fallbackMjcf: GALILEO_DROP_MJCF,
     pyroCode: GALILEO_DROP_PYRO_MODEL,
     pprimConfig: DEFAULT_GALILEO_DROP_PPRIM_CONFIG,
+    visualHints: { showTube: false, showForceIndicator: false },
     simParams: {
       initial_vx: 0,          // Both balls start at rest
       force_magnitude: 0,     // Gravity does the work (set in MJCF)
@@ -365,6 +370,7 @@ export default function App() {
       pyroCode: pyro,
       pprimConfig: scenario.pprimConfig,
       simParams: scenario.simParams,
+      visualHints: scenario.visualHints,
       simResult: null,
       inferResult: null,
     };

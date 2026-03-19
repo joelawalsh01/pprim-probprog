@@ -103,6 +103,13 @@ export interface SimParams {
   camera_name?: string;
 }
 
+export interface VisualizationHints {
+  /** Show tube/channel overlay for first ~40% of trajectory. Default: auto-detect from trajectory shape. */
+  showTube?: boolean;
+  /** Show gold "shove" ball approaching from below at force point. Default: auto-detect from trajectory shape. */
+  showForceIndicator?: boolean;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -110,6 +117,7 @@ export interface Project {
   pyroCode: string;
   pprimConfig: PPrimConfig | null;
   simParams?: SimParams;
+  visualHints?: VisualizationHints;
   simResult: SimulationResult | null;
   inferResult: InferenceResult | null;
 }

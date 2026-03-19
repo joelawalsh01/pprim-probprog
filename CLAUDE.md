@@ -43,22 +43,46 @@ Three Docker services, all behind an Nginx reverse proxy in the frontend contain
 
 ```
 Browser (React/Vite/TypeScript :3000)
-  ├─ /api/sim/*  → Simulator (FastAPI + MuJoCo :8001)
-  └─ /api/infer/* → Inference (FastAPI + Pyro :8002)
+  ├─ /api/sim/*  → Simulator (FastAPI + MuJoCo :8001)  [nginx timeout: 300s]
+  └─ /api/infer/* → Inference (FastAPI + Pyro :8002)    [nginx timeout: 600s]
 ```
 
-- **Frontend** — 6-panel dashboard with project tabs. State lives in React + localStorage (no backend DB). Monaco editor for MJCF/Pyro code, Plotly for visualizations.
+- **Frontend** — 6-panel dashboard with project tabs. State lives in React + localStorage (no backend DB). Monaco editor (lazy-loaded, textarea fallback) for MJCF/Pyro code.
 - **Simulator** — Loads MJCF XML, runs MuJoCo physics, returns trajectory points + base64 PNG frames. Uses OSMesa for offscreen rendering (`MUJOCO_GL=osmesa`).
 - **Inference** — Runs Pyro SVI (default, fast) or MCMC/NUTS against an observed trajectory. Returns posterior distributions + plain-English p-prim interpretation.
+
+### Dashboard panels (6-panel grid in `Dashboard.tsx`)
+| Panel | Component | Role |
+|-------|-----------|------|
+| Top-left | `AnimationPanel` | Frame-by-frame playback of MuJoCo renders + canvas overlay for alternative trajectory |
+| Top-center | `MujocoCodePanel` | MJCF XML editor → Simulate button → POST `/api/sim/simulate` |
+| Top-right | `PyroCodePanel` | Dual tabs: Code (Pyro model editor) + P-Prims (structured config editor with Scan Code / Paste JSON) |
+| Bottom-left | `PriorPosteriorPanel` | Mini histograms per inferred parameter with quantile stats |
+| Bottom-center | `TrajectoryPanel` | Canvas 2D plot: Newtonian (blue) vs alternative (red dashed) trajectories |
+| Bottom-right | `SummaryPanel` | Convergence plot, reasoning steps, findings, collapsible tabs |
 
 ### Data flow
 1. User edits MJCF XML → clicks Simulate → frontend POSTs to `/api/sim/simulate` → gets trajectory + frames
 2. User clicks Run Inference → frontend POSTs to `/api/infer/infer` with trajectory (or "naive" for alternative), model code, and p-prim config → gets posteriors + interpretation
+3. Posterior-predictive sampling: `/api/infer/posterior-predictive` uses stored `_latest_posterior` global
 
 ### Key physics design choices
 - Scene has **no gravity** (isolates force-vs-velocity question)
 - Free joint with **damping=0** for clean physics
 - `velocity_persistence` ∈ [0,1] is the key parameter: 0 = force replaces velocity (p-prim), 1 = Newtonian superposition
+
+## Scenario System
+
+Scenarios are registered in `App.tsx` (`SCENARIO_REGISTRY`) mapping scenario IDs to their MJCF XML, Pyro model code, P-Prim config, and visualization hints. Each scenario has:
+
+1. **MJCF XML** — MuJoCo scene definition (in `services/simulator/src/examples/` and `frontend/src/defaults/mjcfExamples.ts`)
+2. **Pyro model** — probabilistic model code (in `frontend/src/defaults/pyroModels.ts`)
+3. **P-Prim config** — parameter→interpretation mappings (in `frontend/src/defaults/pprimConfigs.ts`)
+4. **Visualization hints** — optional `VisualizationHints` (`showTube`, `showForceIndicator`) controlling AnimationPanel overlays. When omitted (e.g. user-created projects), AnimationPanel falls back to trajectory-shape heuristics.
+
+Built-in scenarios: DiSessa Ball, Spiral Tube, Frictionless Push, Galileo's Drop.
+
+New scenarios should be generated using `claude-mujoco-md/SCENARIO_GENERATION_GUIDE.md` which produces the first three artifacts. Set `visualHints` explicitly in the `SCENARIO_REGISTRY` entry to control which visual overlays appear.
 
 ## P-Prim Config System
 
@@ -75,8 +99,8 @@ The generalized interpretation system decouples parameter→p-prim mappings from
 - Python services use **`uv`** for dependency management (not pip/poetry)
 - Frontend uses **npm** (not yarn/pnpm)
 - No gravity in MuJoCo scenes by default
+- localStorage key: `disessa-balls-projects` — frames are stripped before saving (too large)
 - localStorage migration handles `pprimConfig: null` for old projects
-- Scenario generation guide at `claude-mujoco-md/SCENARIO_GENERATION_GUIDE.md` generates all three outputs (MJCF + Pyro model + P-Prim config JSON)
 
 ## Important: Theoretical language
 

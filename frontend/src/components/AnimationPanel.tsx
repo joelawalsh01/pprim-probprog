@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { TrajectoryPoint } from '../types';
+import type { TrajectoryPoint, VisualizationHints } from '../types';
 
 interface Props {
   frames?: string[];
@@ -8,6 +8,7 @@ interface Props {
   loading: boolean;
   onClear: () => void;
   onAnimationProgress?: (progress: number) => void; // 0–1, -1 means no animation yet
+  visualHints?: VisualizationHints;
 }
 
 const panelStyle: React.CSSProperties = {
@@ -45,7 +46,7 @@ function getVideoMimeType(): string | null {
 }
 
 
-export default function AnimationPanel({ frames, trajectory, naiveTrajectory, loading, onClear, onAnimationProgress }: Props) {
+export default function AnimationPanel({ frames, trajectory, naiveTrajectory, loading, onClear, onAnimationProgress, visualHints }: Props) {
   const [frameIdx, setFrameIdx] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [showNaive, setShowNaive] = useState(true);
@@ -121,7 +122,7 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
       ctx.textAlign = 'center';
       ctx.fillText('Click "Simulate" to run', w / 2, h / 2);
     }
-  }, [frames, frameIdx, frameImagesLoaded, trajectory, naiveTrajectory, showNaive, loading]);
+  }, [frames, frameIdx, frameImagesLoaded, trajectory, naiveTrajectory, showNaive, loading, visualHints]);
 
   // Report animation progress to parent
   useEffect(() => {
@@ -187,7 +188,7 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
       const midPt = trajectory[arcEnd];
       const xTravel = Math.abs(midPt.x - startPt.x);
       const zTravel = Math.abs(midPt.z - startPt.z);
-      const isArc = earlyZ > 0.1 && xTravel > 0.3 && zTravel > 0.3;
+      const isArc = visualHints?.showTube ?? (earlyZ > 0.1 && xTravel > 0.3 && zTravel > 0.3);
       if (isArc) {
         // Draw the tube as two parallel paths offset from the trajectory
         const tubeWidth = 14; // pixels, half-width of the tube
@@ -397,7 +398,8 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
       }
 
       // Skip shove ball for scenarios without a clear horizontal→force transition
-      if (!hasHorizontalPhase) {
+      const shouldShowForce = visualHints?.showForceIndicator ?? hasHorizontalPhase;
+      if (!shouldShowForce) {
         // Still draw the legend — skip the shove ball
       } else {
 
@@ -539,7 +541,7 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
 
     // Restore canvas to current displayed frame
     setExporting(false);
-  }, [frames, frameIdx, trajectory, naiveTrajectory, showNaive]);
+  }, [frames, frameIdx, trajectory, naiveTrajectory, showNaive, visualHints]);
 
   // Export a PNG filmstrip (contact sheet) of key frames — readable by Claude for troubleshooting
   const exportFilmstrip = useCallback(() => {
@@ -613,7 +615,7 @@ export default function AnimationPanel({ frames, trajectory, naiveTrajectory, lo
       a.click();
       URL.revokeObjectURL(url);
     }, 'image/png');
-  }, [frames, trajectory, naiveTrajectory, showNaive]);
+  }, [frames, trajectory, naiveTrajectory, showNaive, visualHints]);
 
   // Snapshot: export current canvas state as PNG
   const exportSnapshot = useCallback(() => {
